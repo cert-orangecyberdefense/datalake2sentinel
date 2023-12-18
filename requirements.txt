@@ -1,5 +1,11 @@
+asyncio
+black
 datalake-scripts
-python-dotenv
+datetime
+ipaddress
 pytest
 pytest-asyncio
-black
+python-dotenv
+re
+stix2
+wheel

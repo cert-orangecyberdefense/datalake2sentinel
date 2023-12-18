@@ -16,12 +16,12 @@ test_dev:
 		python3 -m venv .venv; \
 		. .venv/bin/activate; \
 		pip install -r requirements.txt; \
-		pytest $$path; \
+		pytest; \
 		deactivate \
 	)
 
 test: lint
-	@pytest $$path
+	@pytest
 
 start_env:
 	python3 -m venv .venv

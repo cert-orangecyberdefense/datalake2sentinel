@@ -25,7 +25,9 @@ def _build_logger():
 
 
 def main():
-    pass
+    datalake2Sentinel = Datalake2Sentinel(logger)
+    threats = datalake2Sentinel._getDalakeThreats()
+    print(threats)
 
 
 if __name__ == "__main__":
