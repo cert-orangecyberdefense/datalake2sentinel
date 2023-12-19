@@ -6,6 +6,5 @@ ipaddress
 pytest
 pytest-asyncio
 python-dotenv
-re
 stix2
 wheel

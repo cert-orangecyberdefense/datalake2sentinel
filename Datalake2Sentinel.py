@@ -2,30 +2,26 @@ import asyncio
 import os
 import config
 import uuid
-import re
 import ipaddress
+from constants import (
+    ATOM_TYPE,
+    ATOM_VALUE,
+    TAGS,
+    THREAT_HASHKEY,
+    THREAT_SCORES,
+    THREAT_TYPES,
+    HASHES_MD5,
+    HASHES_SHA1,
+    HASHES_SHA256,
+    LAST_UPDATED,
+    SUBCATEGORIES,
+)
 from datetime import datetime, timedelta
 from stix2 import Indicator, DomainName, IPv4Address, IPv6Address, URL, File
 from datalake import Datalake, Output
 from dotenv import load_dotenv
 
 load_dotenv()
-
-# Constants for accessing threats fields (default)
-ATOM_TYPE = 0
-ATOM_VALUE = 1
-TAGS = 2
-THREAT_HASHKEY = 3
-LAST_UPDATED = 4
-THREAT_TYPES = 5 if config.add_score_labels else None
-THREAT_SCORES = 6 if config.add_score_labels else None
-if config.add_threat_entities_as_labels and config.add_score_labels:
-    SUBCATEGORIES = 7
-else:
-    if not config.add_threat_entities_as_labels:
-        SUBCATEGORIES = None
-    elif not config.add_score_labels and config.add_threat_entities_as_labels:
-        SUBCATEGORIES = 5
 
 
 class Datalake2Sentinel:
@@ -44,6 +40,9 @@ class Datalake2Sentinel:
             "tags",
             "threat_hashkey",
             "last_updated",
+            ".hashes.md5",
+            ".hashes.sha1",
+            ".hashes.sha256",
         ]
         if config.add_score_labels:
             query_fields.append("threat_types")
@@ -77,6 +76,7 @@ class Datalake2Sentinel:
 
     def _generateStixIndicators(self, bulk_searches_results):
         stix_indicators = []
+        self.logger.info("Generating STIX indicators ...")
 
         for index, bulk_search_result in enumerate(bulk_searches_results):
             query_hash = bulk_search_result["advanced_query_hash"]
@@ -93,7 +93,13 @@ class Datalake2Sentinel:
                             uuid.uuid5(uuid.NAMESPACE_OID, query_hash + input_label)
                         ),
                         name=threat[ATOM_VALUE],
-                        pattern=self._create_stix_pattern(threat[ATOM_VALUE]),
+                        pattern=self._create_stix_pattern(
+                            threat[ATOM_VALUE],
+                            threat[ATOM_TYPE],
+                            threat[HASHES_MD5],
+                            threat[HASHES_SHA1],
+                            threat[HASHES_SHA256],
+                        ),
                         pattern_type="stix",
                         valid_from=threat[LAST_UPDATED],
                         valid_until=valid_until.isoformat() + "Z",
@@ -113,51 +119,47 @@ class Datalake2Sentinel:
                         ],
                     )
                 )
-
+        
+        self.logger.info("STIX indicators generated")
+        
         return stix_indicators
 
-    def _create_stix_pattern(self, atom_value):
-        indicator_type = self._identify_indicator_type(atom_value)
+    def _create_stix_pattern(
+        self, atom_value, atom_type, hashes_md5, hashes_sha1, hashes_sha256
+    ):
+        pattern_format = "[{}:{} = '{}']"
 
-        if indicator_type:
-            pattern_format = "[{}:{} = '{}']"
-            if indicator_type == "ipv4-addr":
-                return pattern_format.format("ipv4-addr", "value", atom_value)
-            elif indicator_type == "ipv6-addr":
-                return pattern_format.format("ipv6-addr", "value", atom_value)
-            elif indicator_type == "domain-name":
-                return pattern_format.format("domain-name", "value", atom_value)
-            elif indicator_type == "url":
-                return pattern_format.format("url", "value", atom_value)
-            elif indicator_type == "file-hash":
-                return pattern_format.format("file", "hashes.MD5", atom_value)
-            else:
-                return "Unknown indicator type"
+        if atom_type == "fqdn":
+            return pattern_format.format("domain-name", "value", atom_value)
+        elif atom_type == "url":
+            return pattern_format.format("url", "value", atom_value)
+        elif atom_type == "ip":
+            try:
+                if isinstance(ipaddress.ip_address(atom_value), ipaddress.IPv4Address):
+                    return pattern_format.format("ipv4-addr", "value", atom_value)
+                elif isinstance(
+                    ipaddress.ip_address(atom_value), ipaddress.IPv6Address
+                ):
+                    return pattern_format.format("ipv6-addr", "value", atom_value)
+            except ValueError:
+                pass
+        elif atom_type == "file":
+            conditions = []
+
+            if hashes_md5:
+                conditions.append(f"file:hashes.MD5 = '{hashes_md5}'")
+            if hashes_sha1:
+                conditions.append(f"file:hashes.SHA1 = '{hashes_sha1}'")
+            if hashes_sha256:
+                conditions.append(f"file:hashes.SHA256 = '{hashes_sha256}'")
+            if not conditions:
+                return None
+
+            pattern = " OR ".join(conditions)
+            return f"[{pattern}]"
+
         else:
             return "Unknown indicator type"
-
-    def _identify_indicator_type(self, atom_value):
-        try:
-            if isinstance(ipaddress.ip_address(atom_value), ipaddress.IPv4Address):
-                return "ipv4-addr"
-            elif isinstance(ipaddress.ip_address(atom_value), ipaddress.IPv6Address):
-                return "ipv6-addr"
-        except ValueError:
-            pass
-
-        if re.match(r"^(http|https)://", atom_value, re.IGNORECASE):
-            return "url"
-        elif re.match(
-            r"^(?!-)[a-zA-Z0-9-]{1,63}(?<!-)(\.(?!-)[a-zA-Z0-9-]{1,63}(?<!-))*\.[a-zA-Z]{2,}$",
-            atom_value,
-        ):
-            return "domain-name"
-        elif re.match(
-            r"^[a-fA-F0-9]{32}$|^[a-fA-F0-9]{40}$|^[a-fA-F0-9]{64}$", atom_value
-        ):
-            return "file-hash"
-
-        return None
 
     def _create_stix_labels(self, tags, threat_types, threat_scores, subcategories):
         stix_labels = []

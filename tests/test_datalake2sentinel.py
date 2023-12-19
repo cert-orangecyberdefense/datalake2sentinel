@@ -11,6 +11,9 @@ ipv6 = "2001:0db8:85a3:0000:0000:8a2e:0370:7334"
 url = "https://www.google.com"
 file = "dccffd34ed20d9b20480d99045606af1"
 fqdn = "www.google.com"
+md5 = "098f6bcd4621d373cade4e832627b4f6"
+sha1 = "a94a8fe5ccb19ba61c4c0873d391e987982fbbd3"
+sha256 = "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
 
 bs_results = [
     {
@@ -22,6 +25,9 @@ bs_results = [
             "tags",
             "threat_hashkey",
             "last_updated",
+            ".hashes.md5",
+            ".hashes.sha1",
+            ".hashes.sha256",
             "threat_types",
             "threat_scores",
             "subcategories",
@@ -44,6 +50,9 @@ bs_results = [
                 ],
                 "7468ffb21b36a569b1dc74b1fc93fbb8",
                 "2022-10-12T00:42:02Z",
+                "",
+                "",
+                "",
                 ["malware", "hack", "phishing"],
                 [93, 1, 0],
                 [
@@ -57,6 +66,9 @@ bs_results = [
                 ["bumblebee", "c2", "peerpressure", "port: 443"],
                 "1ab0dd530060ff0934f29d8a8195cf47",
                 "2022-10-12T00:42:02Z",
+                "",
+                "",
+                "",
                 ["malware"],
                 [100],
                 [
@@ -70,6 +82,9 @@ bs_results = [
                 ["c2", "cobaltstrike", "peerpressure", "port: 80"],
                 "15ba40c947d0a322c14fa3d0e7c30eb3",
                 "2022-10-12T00:42:02Z",
+                "",
+                "",
+                "",
                 ["malware"],
                 [100],
                 [
@@ -84,36 +99,53 @@ bs_results = [
 datalake2Sentinel = Datalake2Sentinel(logger=logger)
 
 
-def test_identify_indicator_type():
-    assert datalake2Sentinel._identify_indicator_type(ipv4) == "ipv4-addr"
-    assert datalake2Sentinel._identify_indicator_type(ipv6) == "ipv6-addr"
-    assert datalake2Sentinel._identify_indicator_type(url) == "url"
-    assert datalake2Sentinel._identify_indicator_type(file) == "file-hash"
-    assert datalake2Sentinel._identify_indicator_type(fqdn) == "domain-name"
-    assert datalake2Sentinel._identify_indicator_type(".") == None
-
-
 def test_create_stix_pattern():
     assert (
-        datalake2Sentinel._create_stix_pattern(ipv4) == "[ipv4-addr:value = '0.0.0.0']"
+        datalake2Sentinel._create_stix_pattern(ipv4, "ip", "", "", "")
+        == "[ipv4-addr:value = '0.0.0.0']"
     )
     assert (
-        datalake2Sentinel._create_stix_pattern(ipv6)
+        datalake2Sentinel._create_stix_pattern(ipv6, "ip", "", "", "")
         == "[ipv6-addr:value = '2001:0db8:85a3:0000:0000:8a2e:0370:7334']"
     )
     assert (
-        datalake2Sentinel._create_stix_pattern(url)
+        datalake2Sentinel._create_stix_pattern(url, "url", "", "", "")
         == "[url:value = 'https://www.google.com']"
     )
     assert (
-        datalake2Sentinel._create_stix_pattern(file)
-        == "[file:hashes.MD5 = 'dccffd34ed20d9b20480d99045606af1']"
+        datalake2Sentinel._create_stix_pattern(
+            file, "file", "098f6bcd4621d373cade4e832627b4f6", "", ""
+        )
+        == "[file:hashes.MD5 = '098f6bcd4621d373cade4e832627b4f6']"
     )
     assert (
-        datalake2Sentinel._create_stix_pattern(fqdn)
+        datalake2Sentinel._create_stix_pattern(
+            file,
+            "file",
+            "098f6bcd4621d373cade4e832627b4f6",
+            "",
+            "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+        )
+        == "[file:hashes.MD5 = '098f6bcd4621d373cade4e832627b4f6' OR file:hashes.SHA256 = '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08']"
+    )
+    assert (
+        datalake2Sentinel._create_stix_pattern(
+            file,
+            "file",
+            "098f6bcd4621d373cade4e832627b4f6",
+            "a94a8fe5ccb19ba61c4c0873d391e987982fbbd3",
+            "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+        )
+        == "[file:hashes.MD5 = '098f6bcd4621d373cade4e832627b4f6' OR file:hashes.SHA1 = 'a94a8fe5ccb19ba61c4c0873d391e987982fbbd3' OR file:hashes.SHA256 = '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08']"
+    )
+    assert (
+        datalake2Sentinel._create_stix_pattern(fqdn, "fqdn", "", "", "")
         == "[domain-name:value = 'www.google.com']"
     )
-    assert datalake2Sentinel._create_stix_pattern(".") == "Unknown indicator type"
+    assert (
+        datalake2Sentinel._create_stix_pattern(".", "test", "", "", "")
+        == "Unknown indicator type"
+    )
 
 
 def test_create_stix_labels():
