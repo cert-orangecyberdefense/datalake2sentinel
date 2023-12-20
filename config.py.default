@@ -1,3 +1,4 @@
+# Datalake queries (bulk search) with query_hash
 datalake_queries = [
   {
     "query_hash":"14d206c952ca80e8a5de09cb2ed21d40",
@@ -11,8 +12,11 @@ datalake_queries = [
   }
 ]
 
+# Add Datalake scores as labels in Azure Sentinel 
 add_score_labels = True
 
-add_threat_entities_as_labels = False
+# Add Datalake threat entities (subcategories) as labels in Azure Sentinel
+add_threat_entities_as_labels = False 
 
-upload_frequency = 1 #in hours
+# Cronicity of the integration (in hours)
+upload_frequency = 1 

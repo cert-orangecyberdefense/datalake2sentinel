@@ -9,9 +9,8 @@ clean:
 	find . -type d -name .pytest_cache -exec rm -rf {} +
 	rm -rf .venv
 
-run:
-	python core.py
-	rm -rf .venv
+run: init
+	python3 core.py
 
 test_dev:
 	( \
@@ -24,8 +23,3 @@ test_dev:
 
 test: lint
 	@pytest
-
-start_env:
-	python3 -m venv .venv
-	. .venv/bin/activate
-	pip install -r requirements.txt
