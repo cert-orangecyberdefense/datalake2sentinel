@@ -18,3 +18,10 @@ else:
         SUBCATEGORIES = None
     elif not config.add_score_labels and config.add_threat_entities_as_labels:
         SUBCATEGORIES = 8
+
+# Azure
+AZURE_SCOPE = ["https://management.azure.com/.default"]
+AZURE_AUTHORITY_URL = "https://login.microsoftonline.com/"
+BATCH_SIZE = 100
+REQUESTS_PER_MINUTE = 100
+SOURCE_SYSTEM_NAME = "Datalake - OrangeCyberdefense"

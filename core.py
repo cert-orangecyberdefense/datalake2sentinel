@@ -26,9 +26,7 @@ def _build_logger():
 
 def main():
     datalake2Sentinel = Datalake2Sentinel(logger)
-    threats = datalake2Sentinel._getDalakeThreats()
-    stix_indicators = datalake2Sentinel._generateStixIndicators(threats)
-    
+    datalake2Sentinel.uploadIndicatorsToSentinel()
 
 
 if __name__ == "__main__":

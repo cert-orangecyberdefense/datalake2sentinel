@@ -3,8 +3,11 @@ black
 datalake-scripts
 datetime
 ipaddress
+msal
 pytest
 pytest-asyncio
 python-dotenv
+ratelimit
+requests
 stix2
 wheel

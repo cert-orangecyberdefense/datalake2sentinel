@@ -1,8 +1,12 @@
 import asyncio
+import json
 import os
+import time
 import config
 import uuid
 import ipaddress
+import requests
+from ratelimit import limits, sleep_and_retry
 from constants import (
     ATOM_TYPE,
     ATOM_VALUE,
@@ -15,9 +19,15 @@ from constants import (
     HASHES_SHA256,
     LAST_UPDATED,
     SUBCATEGORIES,
+    AZURE_SCOPE,
+    AZURE_AUTHORITY_URL,
+    BATCH_SIZE,
+    REQUESTS_PER_MINUTE,
+    SOURCE_SYSTEM_NAME,
 )
+from msal import ConfidentialClientApplication
 from datetime import datetime, timedelta
-from stix2 import Indicator, DomainName, IPv4Address, IPv6Address, URL, File
+from stix2 import Indicator
 from datalake import Datalake, Output
 from dotenv import load_dotenv
 
@@ -90,7 +100,10 @@ class Datalake2Sentinel:
                     Indicator(
                         type="indicator",
                         id="indicator--{}".format(
-                            uuid.uuid5(uuid.NAMESPACE_OID, query_hash + input_label)
+                            uuid.uuid5(
+                                uuid.NAMESPACE_OID,
+                                query_hash + input_label + threat[ATOM_VALUE],
+                            )
                         ),
                         name=threat[ATOM_VALUE],
                         pattern=self._create_stix_pattern(
@@ -119,9 +132,9 @@ class Datalake2Sentinel:
                         ],
                     )
                 )
-        
+
         self.logger.info("STIX indicators generated")
-        
+
         return stix_indicators
 
     def _create_stix_pattern(
@@ -179,7 +192,85 @@ class Datalake2Sentinel:
         return stix_labels
 
     def _getAzureAppToken(self):
-        pass
+        self.logger.info(f"Generating new Azure token ...")
 
-    def _uploadIndicatorsToSentinel(self):
-        pass
+        client_id = os.environ["CLIENT_ID"]
+        tenant_id = os.environ["TENANT_ID"]
+        client_credential = [os.environ["CLIENT_CREDENTIAL"]]
+
+        app = ConfidentialClientApplication(
+            client_id=client_id,
+            authority=AZURE_AUTHORITY_URL + tenant_id,
+            client_credential=client_credential,
+        )
+
+        acquire_tokens_result = app.acquire_token_for_client(scopes=AZURE_SCOPE)
+
+        if "error" in acquire_tokens_result:
+            self.logger.error(
+                f"Error: {acquire_tokens_result['error']}\n"
+                f"Description: {acquire_tokens_result['error_description']}"
+            )
+        else:
+            self.logger.info(f"New Azure token acquired")
+            return acquire_tokens_result["access_token"]
+
+    def _batch_post_requests(self, indicators):
+        num_batches = len(indicators) // BATCH_SIZE + (
+            1 if len(indicators) % BATCH_SIZE else 0
+        )
+        access_token = self._getAzureAppToken()
+        self.logger.info("Uploading indicators to Azure Sentinel ...")
+        self.logger.debug(f"Uploading {num_batches} batches to Azure Sentinel ...")
+
+        for i in range(num_batches):
+            # Extract the batch
+            start_index = i * BATCH_SIZE
+            end_index = start_index + BATCH_SIZE
+            batch = indicators[start_index:end_index]
+
+            # Send the request
+            self._send_request(batch, access_token)
+
+        self.logger.debug(
+            f"Successful upload of {num_batches} batches to Azure Sentinel"
+        )
+        self.logger.info("Successful upload of Indicators to Azure Sentinel")
+
+    @sleep_and_retry
+    @limits(calls=REQUESTS_PER_MINUTE, period=60)
+    def _send_request(self, indicators, access_token):
+        workspace_id = os.environ["WORKSPACE_ID"]
+        upload_indicator_url = f"https://sentinelus.azure-api.net/workspaces/{workspace_id}/threatintelligenceindicators:upload?api-version=2022-07-01"
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json",
+        }
+
+        data_to_upload = {
+            "sourcesystem": SOURCE_SYSTEM_NAME,
+            "indicators": [
+                json.loads(indicator.serialize()) for indicator in indicators
+            ],
+        }
+
+        data_to_upload = json.dumps(data_to_upload)
+
+        response = requests.post(
+            upload_indicator_url, headers=headers, data=data_to_upload
+        )
+
+        if response.status_code == 200:
+            self.logger.debug("Successful upload of Indicators to Azure Sentinel")
+        else:
+            self.logger.error(
+                f"An error occured when uploading Indicators to Azure Sentinel : {response.status_code}"
+            )
+        return response
+
+    def uploadIndicatorsToSentinel(self):
+        bulk_searches_results = self._getDalakeThreats()
+        indicators = self._generateStixIndicators(bulk_searches_results)
+        self._batch_post_requests(indicators)
+
+        return
