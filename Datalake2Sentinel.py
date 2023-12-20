@@ -116,10 +116,14 @@ class Datalake2Sentinel:
                         valid_from=threat[LAST_UPDATED],
                         valid_until=valid_until.isoformat() + "Z",
                         labels=self._create_stix_labels(
-                            threat[TAGS],
-                            threat[THREAT_TYPES],
-                            threat[THREAT_SCORES],
-                            threat[SUBCATEGORIES],
+                            tags=threat[TAGS],
+                            threat_types=threat[THREAT_TYPES] if THREAT_TYPES else None,
+                            threat_scores=threat[THREAT_SCORES]
+                            if THREAT_SCORES
+                            else None,
+                            subcategories=threat[SUBCATEGORIES]
+                            if SUBCATEGORIES
+                            else None,
                         ),
                         external_references=[
                             {
@@ -177,8 +181,9 @@ class Datalake2Sentinel:
         stix_labels = []
         stix_labels = stix_labels + tags
 
-        for subcategory in subcategories:
-            stix_labels.append(subcategory)
+        if subcategories:
+            for subcategory in subcategories:
+                stix_labels.append(subcategory)
 
         if threat_types:
             stix_labels.append("dtl_score_" + str(max(threat_scores)))
