@@ -1,5 +1,8 @@
 import logging
 import os
+import schedule
+import time
+import config
 from Datalake2Sentinel import Datalake2Sentinel
 from dotenv import load_dotenv
 
@@ -26,7 +29,12 @@ def _build_logger():
 
 def main():
     datalake2Sentinel = Datalake2Sentinel(logger)
-    datalake2Sentinel.uploadIndicatorsToSentinel()
+    schedule.every(config.upload_frequency).hours.do(
+        datalake2Sentinel.uploadIndicatorsToSentinel
+    )
+    while True:
+        schedule.run_pending()
+        time.sleep(1)
 
 
 if __name__ == "__main__":

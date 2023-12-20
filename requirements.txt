@@ -9,5 +9,6 @@ pytest-asyncio
 python-dotenv
 ratelimit
 requests
+schedule
 stix2
 wheel
