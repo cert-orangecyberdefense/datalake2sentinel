@@ -12,11 +12,11 @@ load_dotenv()
 def _build_logger():
     logger = logging.getLogger("datalake2sentinel")
     logger.setLevel(logging.INFO)
-    if os.environ["VERBOSE_LOG"]:
+    if config.verbose_log:
         logger.setLevel(logging.DEBUG)
     handler = logging.FileHandler(os.environ["LOG_FILE"], mode="a")
     handler.setLevel(logging.INFO)
-    if os.environ["VERBOSE_LOG"]:
+    if config.verbose_log:
         handler.setLevel(logging.DEBUG)
     formatter = logging.Formatter(
         "%(asctime)s - %(name)s - %(levelname)s - %(message)s"

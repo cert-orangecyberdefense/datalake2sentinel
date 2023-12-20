@@ -20,3 +20,6 @@ add_threat_entities_as_labels = False
 
 # Cronicity of the integration (in hours)
 upload_frequency = 1 
+
+# Logger config
+verbose_log = False
