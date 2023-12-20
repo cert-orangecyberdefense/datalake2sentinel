@@ -101,7 +101,7 @@ class Datalake2Sentinel:
                         id="indicator--{}".format(
                             uuid.uuid5(
                                 uuid.NAMESPACE_OID,
-                                query_hash + input_label + threat[ATOM_VALUE],
+                                query_hash + input_label + threat[THREAT_HASHKEY],
                             )
                         ),
                         name=threat[ATOM_VALUE],
