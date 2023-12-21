@@ -29,12 +29,15 @@ def _build_logger():
 
 def main():
     datalake2Sentinel = Datalake2Sentinel(logger)
-    schedule.every(config.upload_frequency).hours.do(
-        datalake2Sentinel.uploadIndicatorsToSentinel
-    )
-    while True:
-        schedule.run_pending()
-        time.sleep(1)
+    if config.run_as_cron:
+        schedule.every(config.upload_frequency).hours.do(
+            datalake2Sentinel.uploadIndicatorsToSentinel
+        )
+        while True:
+            schedule.run_pending()
+            time.sleep(1)
+    else:
+        datalake2Sentinel.uploadIndicatorsToSentinel()
 
 
 if __name__ == "__main__":

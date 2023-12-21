@@ -22,7 +22,6 @@ bs_results = [
         "query_fields": [
             "atom_type",
             "atom_value",
-            "tags",
             "threat_hashkey",
             "last_updated",
             ".hashes.md5",
@@ -38,16 +37,6 @@ bs_results = [
             [
                 "ip",
                 "43.139.67.239",
-                [
-                    "c2",
-                    "cobalt strike",
-                    "cobaltstrike",
-                    "cobaltstrike-2",
-                    "cs-watermark-1234567890",
-                    "peerpressure",
-                    "port: 80",
-                    "shenzhen tencent computer systems company limited",
-                ],
                 "7468ffb21b36a569b1dc74b1fc93fbb8",
                 "2022-10-12T00:42:02Z",
                 "",
@@ -63,7 +52,6 @@ bs_results = [
             [
                 "ip",
                 "37.187.180.39",
-                ["bumblebee", "c2", "peerpressure", "port: 443"],
                 "1ab0dd530060ff0934f29d8a8195cf47",
                 "2022-10-12T00:42:02Z",
                 "",
@@ -79,7 +67,6 @@ bs_results = [
             [
                 "ip",
                 "154.22.168.135",
-                ["c2", "cobaltstrike", "peerpressure", "port: 80"],
                 "15ba40c947d0a322c14fa3d0e7c30eb3",
                 "2022-10-12T00:42:02Z",
                 "",
@@ -142,17 +129,12 @@ def test_create_stix_pattern():
         datalake2Sentinel._create_stix_pattern(fqdn, "fqdn", "", "", "")
         == "[domain-name:value = 'www.google.com']"
     )
-    assert (
+    with pytest.raises(Exception) as e:
         datalake2Sentinel._create_stix_pattern(".", "test", "", "", "")
-        == "Unknown indicator type"
-    )
+        assert "unknown" in str(e)
 
 
 def test_create_stix_labels():
-    tags = [
-        "c2",
-        "cobalt strike",
-    ]
     threat_types = ["malware", "hack", "phishing"]
     threat_scores = [93, 1, 0]
     subcategories = [
@@ -161,15 +143,13 @@ def test_create_stix_labels():
     ]
 
     assert datalake2Sentinel._create_stix_labels(
-        tags, threat_types, threat_scores, subcategories
+        threat_types, threat_scores, subcategories
     ) == [
-        "c2",
-        "cobalt strike",
         "OCD - Threat pattern:Command and Control [C2]",
         "Tool:Cobalt Strike - S0154",
-        "dtl_score_93",
-        "dtl_score_malware_93",
-        "dtl_score_hack_1",
+        "dtl_score_90",
+        "dtl_score_malware_90",
+        "dtl_score_hack_0",
         "dtl_score_phishing_0",
     ]
 

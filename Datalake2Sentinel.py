@@ -1,5 +1,6 @@
 import asyncio
 import json
+import time
 import os
 import config
 import uuid
@@ -9,7 +10,6 @@ from ratelimit import limits, sleep_and_retry
 from constants import (
     ATOM_TYPE,
     ATOM_VALUE,
-    TAGS,
     THREAT_HASHKEY,
     THREAT_SCORES,
     THREAT_TYPES,
@@ -26,7 +26,7 @@ from constants import (
 )
 from msal import ConfidentialClientApplication
 from datetime import datetime, timedelta
-from stix2 import Indicator
+from stix2 import Indicator, exceptions
 from datalake import Datalake, Output
 from dotenv import load_dotenv
 
@@ -46,7 +46,6 @@ class Datalake2Sentinel:
         query_fields = [
             "atom_type",
             "atom_value",
-            "tags",
             "threat_hashkey",
             "last_updated",
             ".hashes.md5",
@@ -66,6 +65,10 @@ class Datalake2Sentinel:
         coroutines = []
 
         for query in config.datalake_queries:
+            self.logger.info(
+                f"Creating BulkSearch for {query['query_hash']} query_hash ..."
+            )
+
             task = dtl.BulkSearch.create_task(
                 query_hash=query["query_hash"], query_fields=query_fields
             )
@@ -95,46 +98,55 @@ class Datalake2Sentinel:
             )
 
             for threat in bulk_search_result["results"]:
-                stix_indicators.append(
-                    Indicator(
-                        type="indicator",
-                        id="indicator--{}".format(
-                            uuid.uuid5(
-                                uuid.NAMESPACE_OID,
-                                query_hash + input_label + threat[THREAT_HASHKEY],
-                            )
-                        ),
-                        name=threat[ATOM_VALUE],
-                        pattern=self._create_stix_pattern(
-                            threat[ATOM_VALUE],
-                            threat[ATOM_TYPE],
-                            threat[HASHES_MD5],
-                            threat[HASHES_SHA1],
-                            threat[HASHES_SHA256],
-                        ),
-                        pattern_type="stix",
-                        valid_from=threat[LAST_UPDATED],
-                        valid_until=valid_until.isoformat() + "Z",
-                        labels=self._create_stix_labels(
-                            tags=threat[TAGS],
-                            threat_types=threat[THREAT_TYPES] if THREAT_TYPES else None,
-                            threat_scores=threat[THREAT_SCORES]
-                            if THREAT_SCORES
-                            else None,
-                            subcategories=threat[SUBCATEGORIES]
-                            if SUBCATEGORIES
-                            else None,
-                        ),
-                        external_references=[
-                            {
-                                "source_name": "Orange Cyberdefense",
-                                "url": "https://datalake.cert.orangecyberdefense.com/gui/threat/{}".format(
-                                    threat[THREAT_HASHKEY]
-                                ),
-                            }
-                        ],
+                try:
+                    stix_indicators.append(
+                        Indicator(
+                            type="indicator",
+                            id="indicator--{}".format(
+                                uuid.uuid5(
+                                    uuid.NAMESPACE_OID,
+                                    query_hash + input_label + threat[THREAT_HASHKEY],
+                                )
+                            ),
+                            name=threat[ATOM_VALUE],
+                            pattern=self._create_stix_pattern(
+                                threat[ATOM_VALUE],
+                                threat[ATOM_TYPE],
+                                threat[HASHES_MD5],
+                                threat[HASHES_SHA1],
+                                threat[HASHES_SHA256],
+                            ),
+                            pattern_type="stix",
+                            valid_from=threat[LAST_UPDATED],
+                            valid_until=valid_until.isoformat() + "Z",
+                            labels=self._create_stix_labels(
+                                threat_types=threat[THREAT_TYPES]
+                                if THREAT_TYPES
+                                else None,
+                                threat_scores=threat[THREAT_SCORES]
+                                if THREAT_SCORES
+                                else None,
+                                subcategories=threat[SUBCATEGORIES]
+                                if SUBCATEGORIES
+                                else None,
+                            ),
+                            external_references=[
+                                {
+                                    "source_name": "Orange Cyberdefense",
+                                    "url": "https://datalake.cert.orangecyberdefense.com/gui/threat/{}".format(
+                                        threat[THREAT_HASHKEY]
+                                    ),
+                                }
+                            ],
+                        )
                     )
-                )
+                except exceptions.InvalidValueError as e:
+                    self.logger.error(
+                        f"An error occured when creating stix indicator for threat {threat} : {e}"
+                    )
+                except Exception as e:
+                    if "unknown" in str(e):
+                        self.logger.error(f"{e}")
 
         self.logger.info("STIX indicators generated")
 
@@ -143,20 +155,20 @@ class Datalake2Sentinel:
     def _create_stix_pattern(
         self, atom_value, atom_type, hashes_md5, hashes_sha1, hashes_sha256
     ):
-        pattern_format = "[{}:{} = '{}']"
+        pattern_format = "[{}:{} = {}]"
 
-        if atom_type == "fqdn":
-            return pattern_format.format("domain-name", "value", atom_value)
+        if atom_type == "domain" or atom_type == "fqdn":
+            return pattern_format.format("domain-name", "value", repr(atom_value))
         elif atom_type == "url":
-            return pattern_format.format("url", "value", atom_value)
+            return pattern_format.format("url", "value", repr(atom_value))
         elif atom_type == "ip":
             try:
                 if isinstance(ipaddress.ip_address(atom_value), ipaddress.IPv4Address):
-                    return pattern_format.format("ipv4-addr", "value", atom_value)
+                    return pattern_format.format("ipv4-addr", "value", repr(atom_value))
                 elif isinstance(
                     ipaddress.ip_address(atom_value), ipaddress.IPv6Address
                 ):
-                    return pattern_format.format("ipv6-addr", "value", atom_value)
+                    return pattern_format.format("ipv6-addr", "value", repr(atom_value))
             except ValueError:
                 pass
         elif atom_type == "file":
@@ -175,22 +187,25 @@ class Datalake2Sentinel:
             return f"[{pattern}]"
 
         else:
-            return "Unknown indicator type"
+            raise Exception(f"Atom type '{atom_type}' is unknown or is not handle")
 
-    def _create_stix_labels(self, tags, threat_types, threat_scores, subcategories):
+    def _create_stix_labels(self, threat_types, threat_scores, subcategories):
         stix_labels = []
-        stix_labels = stix_labels + tags
 
         if subcategories:
             for subcategory in subcategories:
                 stix_labels.append(subcategory)
 
         if threat_types:
-            stix_labels.append("dtl_score_" + str(max(threat_scores)))
+            max_score = max(threat_scores) - (max(threat_scores) % 10)
+            max_score = max_score if max_score < 100 else 90
+            stix_labels.append("dtl_score_" + str(max_score))
 
             for index, threat_type in enumerate(threat_types):
                 stix_labels.append(
-                    "dtl_score_{}_{}".format(threat_type, threat_scores[index])
+                    "dtl_score_{}_{}".format(
+                        threat_type, threat_scores[index] - (threat_scores[index] % 10)
+                    )
                 )
 
         return stix_labels
@@ -227,14 +242,25 @@ class Datalake2Sentinel:
         self.logger.info("Uploading indicators to Azure Sentinel ...")
         self.logger.debug(f"Uploading {num_batches} batches to Azure Sentinel ...")
 
-        for i in range(num_batches):
+        batch_index = 0
+
+        while batch_index < num_batches:
             # Extract the batch
-            start_index = i * BATCH_SIZE
+            start_index = batch_index * BATCH_SIZE
             end_index = start_index + BATCH_SIZE
             batch = indicators[start_index:end_index]
 
             # Send the request
-            self._send_request(batch, access_token)
+            response = self._send_request(batch, access_token)
+
+            # When hitting the limit wait
+            if response.status_code == 429:
+                self.logger.debug(
+                    f"Wait for {response.headers['Retry-After']} seconds and retry batch"
+                )
+                time.sleep(int(response.headers["Retry-After"]))
+            else:
+                batch_index = batch_index + 1
 
         self.logger.debug(
             f"Successful upload of {num_batches} batches to Azure Sentinel"
@@ -270,6 +296,7 @@ class Datalake2Sentinel:
             self.logger.error(
                 f"An error occured when uploading Indicators to Azure Sentinel : {response.status_code}"
             )
+
         return response
 
     def uploadIndicatorsToSentinel(self):

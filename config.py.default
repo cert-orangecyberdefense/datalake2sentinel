@@ -19,6 +19,7 @@ add_score_labels = True
 add_threat_entities_as_labels = False 
 
 # Cronicity of the integration (in hours)
+run_as_cron = False
 upload_frequency = 1 
 
 # Logger config
