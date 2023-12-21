@@ -51,10 +51,10 @@ class Datalake2Sentinel:
             ".hashes.md5",
             ".hashes.sha1",
             ".hashes.sha256",
+            "threat_scores",
         ]
         if config.add_score_labels:
             query_fields.append("threat_types")
-            query_fields.append("threat_scores")
         if config.add_threat_entities_as_labels:
             query_fields.append("subcategories")
 
@@ -120,16 +120,18 @@ class Datalake2Sentinel:
                             valid_from=threat[LAST_UPDATED],
                             valid_until=valid_until.isoformat() + "Z",
                             labels=self._create_stix_labels(
+                                input_label=input_label,
                                 threat_types=threat[THREAT_TYPES]
                                 if THREAT_TYPES
                                 else None,
                                 threat_scores=threat[THREAT_SCORES]
-                                if THREAT_SCORES
+                                if config.add_score_labels
                                 else None,
                                 subcategories=threat[SUBCATEGORIES]
                                 if SUBCATEGORIES
                                 else None,
                             ),
+                            confidence=max(threat[THREAT_SCORES]),
                             external_references=[
                                 {
                                     "source_name": "Orange Cyberdefense",
@@ -189,8 +191,10 @@ class Datalake2Sentinel:
         else:
             raise Exception(f"Atom type '{atom_type}' is unknown or is not handle")
 
-    def _create_stix_labels(self, threat_types, threat_scores, subcategories):
-        stix_labels = []
+    def _create_stix_labels(
+        self, input_label, threat_types, threat_scores, subcategories
+    ):
+        stix_labels = [input_label]
 
         if subcategories:
             for subcategory in subcategories:

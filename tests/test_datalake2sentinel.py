@@ -27,8 +27,8 @@ bs_results = [
             ".hashes.md5",
             ".hashes.sha1",
             ".hashes.sha256",
-            "threat_types",
             "threat_scores",
+            "threat_types",
             "subcategories",
         ],
         "for_stix_export": False,
@@ -42,8 +42,8 @@ bs_results = [
                 "",
                 "",
                 "",
-                ["malware", "hack", "phishing"],
                 [93, 1, 0],
+                ["malware", "hack", "phishing"],
                 [
                     "OCD - Threat pattern:Command and Control [C2]",
                     "Tool:Cobalt Strike - S0154",
@@ -57,8 +57,8 @@ bs_results = [
                 "",
                 "",
                 "",
-                ["malware"],
                 [100],
+                ["malware"],
                 [
                     "Malware:Bumblebee - S1039",
                     "OCD - Threat pattern:Command and Control [C2]",
@@ -72,8 +72,8 @@ bs_results = [
                 "",
                 "",
                 "",
-                ["malware"],
                 [100],
+                ["malware"],
                 [
                     "OCD - Threat pattern:Command and Control [C2]",
                     "Tool:Cobalt Strike - S0154",
@@ -135,6 +135,7 @@ def test_create_stix_pattern():
 
 
 def test_create_stix_labels():
+    input_label = "query_label"
     threat_types = ["malware", "hack", "phishing"]
     threat_scores = [93, 1, 0]
     subcategories = [
@@ -143,8 +144,9 @@ def test_create_stix_labels():
     ]
 
     assert datalake2Sentinel._create_stix_labels(
-        threat_types, threat_scores, subcategories
+        input_label, threat_types, threat_scores, subcategories
     ) == [
+        "query_label",
         "OCD - Threat pattern:Command and Control [C2]",
         "Tool:Cobalt Strike - S0154",
         "dtl_score_90",
