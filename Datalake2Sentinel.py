@@ -163,6 +163,8 @@ class Datalake2Sentinel:
             return pattern_format.format("domain-name", "value", repr(atom_value))
         elif atom_type == "url":
             return pattern_format.format("url", "value", repr(atom_value))
+        elif atom_type == "email":
+            return pattern_format.format("email-addr", "value", repr(atom_value))
         elif atom_type == "ip":
             try:
                 if isinstance(ipaddress.ip_address(atom_value), ipaddress.IPv4Address):
