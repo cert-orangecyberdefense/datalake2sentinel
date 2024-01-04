@@ -11,4 +11,7 @@ TODO
 * Rename the file `.env.default` to `.env` and replace the environment variables with yours. This file is use to define all the credentials for **Datalake API** and **Azure**.
 
 ### Usage
-Execute the command `make run` to install all the dependencies and launch the integration.
+After the prerequisites are all setup, you can launch **datalake2sentinel** connector using two methods:
+
+* Execute the command `make run` to install all the dependencies and launch the integration directly using **Python**.
+* Or execute only one of the commands `make run_docker` or `docker build . -t datalake2sentinel && docker run datalake2sentinel` to run the connector in a docker container.

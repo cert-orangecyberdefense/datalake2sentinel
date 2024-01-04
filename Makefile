@@ -12,6 +12,10 @@ clean:
 run: init
 	python3 core.py
 
+run_docker:
+	docker build . -t datalake2sentinel
+	docker run datalake2sentinel
+
 test_dev:
 	( \
 		python3 -m venv .venv; \
