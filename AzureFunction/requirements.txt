@@ -1,0 +1,12 @@
+azure-keyvault-secrets
+azure-identity
+black
+datalake-scripts
+datetime
+ipaddress
+msal
+ratelimit
+requests
+schedule
+stix2
+wheel
