@@ -82,7 +82,7 @@ This is how the create the Azure Function app.
 - OS can remain Linux
 - At plan type choose *App service plan*
 - Other settings can be left to default values. Click *Review + Create*
-3. (TODO: Add documentation relative to **use RBAC to define appropriate roles to make Function access to secrets in Vault**)
+3. Assign the correct RBAC to your Function so that it can access to secrets in Vault.
 
 4. Go back to the Azure Function and click on *Configuration*
 5. Add a new application setting with the name `tenant` and the Key Vault reference string `@Microsoft.KeyVault(SecretUri=https://<keyvaultname>.vault.azure.net/secrets/tenant/)`

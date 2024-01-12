@@ -265,6 +265,7 @@ class Datalake2Sentinel:
             # Send the request
             response = self._send_request(batch, access_token)
 
+            #TODO: Manage the cases 500, 504 and 503
             # When hitting the limit wait
             if response.status_code == 429:
                 self.logger.debug(
