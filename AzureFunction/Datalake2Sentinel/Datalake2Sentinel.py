@@ -36,13 +36,13 @@ class Datalake2Sentinel:
     Datalake, transform them into STIX indicator's object and send them to Sentinel.
     """
 
-    def __init__(self, logger, tenant, datalake):
+    def __init__(self, logger, tenant, credential, datalake):
         self.logger = logger
         self.dtlUsername = datalake["dtlUsername"]
         self.dtlPassword = datalake["dtlPassword"]
         self.clientId = tenant["clientId"]
         self.tenantId = tenant["tenantId"]
-        self.clientCredential = tenant["clientCredential"]
+        self.credential = credential
         self.workspaceId = tenant["workspaceId"]
 
     def _getDalakeThreats(self):
@@ -127,15 +127,17 @@ class Datalake2Sentinel:
                             valid_until=valid_until.isoformat() + "Z",
                             labels=self._create_stix_labels(
                                 input_label=input_label,
-                                threat_types=threat[THREAT_TYPES]
-                                if THREAT_TYPES
-                                else None,
-                                threat_scores=threat[THREAT_SCORES]
-                                if config.add_score_labels
-                                else None,
-                                subcategories=threat[SUBCATEGORIES]
-                                if SUBCATEGORIES
-                                else None,
+                                threat_types=(
+                                    threat[THREAT_TYPES] if THREAT_TYPES else None
+                                ),
+                                threat_scores=(
+                                    threat[THREAT_SCORES]
+                                    if config.add_score_labels
+                                    else None
+                                ),
+                                subcategories=(
+                                    threat[SUBCATEGORIES] if SUBCATEGORIES else None
+                                ),
                             ),
                             confidence=max(threat[THREAT_SCORES]),
                             external_references=[
@@ -227,15 +229,14 @@ class Datalake2Sentinel:
 
         client_id = self.clientId
         tenant_id = self.tenantId
-        client_credential = [self.clientCredential]
 
         app = ConfidentialClientApplication(
             client_id=client_id,
             authority=AZURE_AUTHORITY_URL + tenant_id,
-            client_credential=client_credential,
+            client_credential=self.credential,
         )
 
-        acquire_tokens_result = app.acquire_token_for_client(scopes=AZURE_SCOPE)
+        acquire_tokens_result = app.acquire_token_for_client(scopes=[AZURE_SCOPE])
 
         if "error" in acquire_tokens_result:
             self.logger.error(
@@ -265,7 +266,7 @@ class Datalake2Sentinel:
             # Send the request
             response = self._send_request(batch, access_token)
 
-            #TODO: Manage the cases 500, 504 and 503
+            # TODO: Manage the cases 500, 504 and 503
             # When hitting the limit wait
             if response.status_code == 429:
                 self.logger.debug(

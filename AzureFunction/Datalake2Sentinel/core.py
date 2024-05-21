@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 import Datalake2Sentinel.config as config
 import azure.functions as func
 import json
+from azure.identity._credentials.certificate import load_pem_certificate
 from Datalake2Sentinel.Datalake2Sentinel import Datalake2Sentinel
 
 
@@ -27,10 +28,20 @@ def _build_logger():
 
 
 def pmain(logger):
+    pem_certificate = os.getenv("certificate")
     tenant = json.loads(os.getenv("tenant"))
     datalake = json.loads(os.getenv("datalake"))
 
-    datalake2Sentinel = Datalake2Sentinel(logger, tenant, datalake)
+    if pem_certificate:
+        certificate = load_pem_certificate(pem_certificate.encode())
+        credential = {
+            "thumbprint": certificate.fingerprint.hex(),
+            "private_key": certificate.private_key,
+        }
+    else:
+        credential = [tenant["clientCredential"]]
+
+    datalake2Sentinel = Datalake2Sentinel(logger, tenant, credential, datalake)
     datalake2Sentinel.uploadIndicatorsToSentinel()
 
 
