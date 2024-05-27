@@ -107,7 +107,7 @@ This is how the create the Azure Function app.
 4. Go back to the Azure Function and click on _Configuration_
 5. Add a new application setting with the name `tenant` and the Key Vault reference string `@Microsoft.KeyVault(SecretUri=https://<keyvaultname>.vault.azure.net/secrets/tenant/)`
 6. Add a new application setting with the name `datalake` and the Key Vault reference string `@Microsoft.KeyVault(SecretUri=https://<keyvaultname>.vault.azure.net/secrets/datalake/)`
-7. (Only if using a certificate) Add a new application setting with the name `certificate` and the Key Vault reference string `@Microsoft.KeyVault(SecretUri=https://<keyvaultname>.vault.azure.net/secrets/cert/)`
+7. (Only if using a certificate) Add a new application setting with the name `certificate` and the Key Vault reference string `@Microsoft.KeyVault(SecretUri=https://<keyvaultname>.vault.azure.net/certificates/cert/)`
 8. Add a new application setting with the name `timerTriggerSchedule`
    - The `timerTriggerSchedule` takes a cron expression. For more information, see [Timer trigger for Azure Functions](https://learn.microsoft.com/en-us/azure/azure-functions/functions-bindings-timer?tabs=python-v2%2Cin-process&pivots=programming-language-python).
    - For example to run once every two hours cron expression: `0 */2 * * *`
