@@ -111,14 +111,17 @@ This is how the create the Azure Function app.
 8. Add a new application setting with the name `timerTriggerSchedule`
    - The `timerTriggerSchedule` takes a cron expression. For more information, see [Timer trigger for Azure Functions](https://learn.microsoft.com/en-us/azure/azure-functions/functions-bindings-timer?tabs=python-v2%2Cin-process&pivots=programming-language-python).
    - For example to run once every two hours cron expression: `0 */2 * * *`
+9. Do the same for `log_file` and set it to `/tmp/datalake2sentinel.log`.
+10. In some case you need to change the value of env variable `FUNCTIONS_EXTENSION_VERSION` from `~4` to `~3`.
 
 ### Upload the Function Code with Visual Studio Code
 
 1. Download and install [Visual Studio Code](https://code.visualstudio.com/)
 2. Install the [Azure Functions extension](https://marketplace.visualstudio.com/items?itemName=ms-azuretools.vscode-azurefunctions)
 3. Open Visual Studio Code and open the folder containing this repo
-4. Right click on the folder called `Azure Function` and select _Deploy to Function App..._
-5. Select the Azure Function you created in the previous steps and click _Deploy_
+4. If not generated automatically, create the folder `.vscode` at the root of the repository folder and replace all its files with the one in [.vscode](../.vscode/).
+5. Right click on the folder called `Azure Function` and select _Deploy to Function App..._
+6. Select the Azure Function you created in the previous steps and click _Deploy_
 
 ## Validation
 

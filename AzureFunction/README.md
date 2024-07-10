@@ -50,3 +50,5 @@ The full instructions can be found in [INSTALL.md](INSTALL.md)
 10. Do the same for the `datalake` secret (`@Microsoft.KeyVault(SecretUri=https://<keyvaultname>.vault.azure.net/secrets/datalake/)`)
 11. Do the same for the `certificate` secret if needed (`@Microsoft.KeyVault(SecretUri=https://<keyvaultname>.vault.azure.net/certificates/cert/)`)
 12. Add a "New application setting" (env variable) `timerTriggerSchedule` and set it to run. The `timerTriggerSchedule` takes a cron expression. For more information, see [Timer trigger for Azure Functions](https://learn.microsoft.com/en-us/azure/azure-functions/functions-bindings-timer?tabs=python-v2%2Cin-process&pivots=programming-language-python).
+13. Do the same for `log_file` and set it to `/tmp/datalake2sentinel.log`.
+14. In some case you need to change the value of env variable `FUNCTIONS_EXTENSION_VERSION` from `~4` to `~3`.
