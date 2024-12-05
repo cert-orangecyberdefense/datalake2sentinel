@@ -12,6 +12,7 @@ from constants import (
     ATOM_VALUE,
     THREAT_HASHKEY,
     THREAT_SCORES,
+    TAGS,
     THREAT_TYPES,
     HASHES_MD5,
     HASHES_SHA1,
@@ -57,11 +58,10 @@ class Datalake2Sentinel:
             query_fields.append("threat_types")
         if config.add_threat_entities_as_labels:
             query_fields.append("subcategories")
+        if config.add_threat_tags_as_labels:
+            query_fields.append("tags")
 
-        dtl = Datalake(
-            username=os.environ["OCD_DTL_USERNAME"],
-            password=os.environ["OCD_DTL_PASSWORD"],
-        )
+        dtl = Datalake(longterm_token=os.environ["OCD_DTL_LONGTERM_TOKEN"])
         coroutines = []
 
         for query in config.datalake_queries:
@@ -130,6 +130,7 @@ class Datalake2Sentinel:
                                 subcategories=threat[SUBCATEGORIES]
                                 if SUBCATEGORIES
                                 else None,
+                                tags=threat[TAGS] if TAGS else None,
                             ),
                             confidence=max(threat[THREAT_SCORES]),
                             external_references=[
@@ -194,13 +195,12 @@ class Datalake2Sentinel:
             raise Exception(f"Atom type '{atom_type}' is unknown or is not handle")
 
     def _create_stix_labels(
-        self, input_label, threat_types, threat_scores, subcategories
+        self, input_label, threat_types, threat_scores, subcategories, tags
     ):
         stix_labels = [input_label]
 
         if subcategories:
-            for subcategory in subcategories:
-                stix_labels.append(subcategory)
+            stix_labels.extend(subcategories)
 
         if threat_types:
             max_score = max(threat_scores) - (max(threat_scores) % 10)
@@ -213,6 +213,9 @@ class Datalake2Sentinel:
                         threat_type, threat_scores[index] - (threat_scores[index] % 10)
                     )
                 )
+
+        if tags:
+            stix_labels.extend(tags)
 
         return stix_labels
 

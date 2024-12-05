@@ -10,13 +10,34 @@ HASHES_SHA1 = 5
 HASHES_SHA256 = 6
 THREAT_SCORES = 7
 THREAT_TYPES = 8 if config.add_score_labels else None
-if config.add_threat_entities_as_labels and config.add_score_labels:
-    SUBCATEGORIES = 9
+if config.add_score_labels:
+    if config.add_threat_entities_as_labels and config.add_threat_tags_as_labels:
+        SUBCATEGORIES = 9
+        TAGS = 10
+    else:
+        if config.add_threat_entities_as_labels:
+            SUBCATEGORIES = 9
+            TAGS = None
+        elif config.add_threat_tags_as_labels:
+            TAGS = 9
+            SUBCATEGORIES = None
+        else:
+            TAGS = None
+            SUBCATEGORIES = None
 else:
-    if not config.add_threat_entities_as_labels:
-        SUBCATEGORIES = None
-    elif not config.add_score_labels and config.add_threat_entities_as_labels:
+    if config.add_threat_entities_as_labels and config.add_threat_tags_as_labels:
         SUBCATEGORIES = 8
+        TAGS = 9
+    else:
+        if config.add_threat_entities_as_labels:
+            SUBCATEGORIES = 8
+            TAGS = None
+        elif config.add_threat_tags_as_labels:
+            TAGS = 8
+            SUBCATEGORIES = None
+        else:
+            TAGS = None
+            SUBCATEGORIES = None
 
 # Azure
 AZURE_SCOPE = "https://management.azure.com/.default"
