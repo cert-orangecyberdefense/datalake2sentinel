@@ -12,6 +12,7 @@ from Datalake2Sentinel.constants import (
     ATOM_VALUE,
     THREAT_HASHKEY,
     THREAT_SCORES,
+    TAGS,
     THREAT_TYPES,
     HASHES_MD5,
     HASHES_SHA1,
@@ -38,8 +39,7 @@ class Datalake2Sentinel:
 
     def __init__(self, logger, tenant, credential, datalake):
         self.logger = logger
-        self.dtlUsername = datalake["dtlUsername"]
-        self.dtlPassword = datalake["dtlPassword"]
+        self.dtlLongTermToken = datalake["dtlLongTermToken"]
         self.clientId = tenant["clientId"]
         self.tenantId = tenant["tenantId"]
         self.credential = credential
@@ -60,11 +60,10 @@ class Datalake2Sentinel:
             query_fields.append("threat_types")
         if config.add_threat_entities_as_labels:
             query_fields.append("subcategories")
+        if config.add_threat_tags_as_labels:
+            query_fields.append("tags")
 
-        dtl = Datalake(
-            username=self.dtlUsername,
-            password=self.dtlPassword,
-        )
+        dtl = Datalake(longterm_token=self.dtlLongTermToken)
         coroutines = []
 
         for query in config.datalake_queries:
@@ -138,6 +137,7 @@ class Datalake2Sentinel:
                                 subcategories=(
                                     threat[SUBCATEGORIES] if SUBCATEGORIES else None
                                 ),
+                                tags=(threat[TAGS] if TAGS else None),
                             ),
                             confidence=max(threat[THREAT_SCORES]),
                             external_references=[
@@ -202,13 +202,12 @@ class Datalake2Sentinel:
             raise Exception(f"Atom type '{atom_type}' is unknown or is not handle")
 
     def _create_stix_labels(
-        self, input_label, threat_types, threat_scores, subcategories
+        self, input_label, threat_types, threat_scores, subcategories, tags
     ):
         stix_labels = [input_label]
 
         if subcategories:
-            for subcategory in subcategories:
-                stix_labels.append(subcategory)
+            stix_labels.extend(subcategories)
 
         if threat_types:
             max_score = max(threat_scores) - (max(threat_scores) % 10)
@@ -221,6 +220,9 @@ class Datalake2Sentinel:
                         threat_type, threat_scores[index] - (threat_scores[index] % 10)
                     )
                 )
+
+        if tags:
+            stix_labels.extend(tags)
 
         return stix_labels
 

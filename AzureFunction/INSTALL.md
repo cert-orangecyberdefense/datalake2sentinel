@@ -70,8 +70,7 @@ The combined value that should be stored in the Keyvault, is as follows, where t
 
 ```json
 {
-  "dtlUsername": "<DATALAKE_USERNAME>",
-  "dtlPassword": "<DATALAKE_PASSWORD>"
+  "dtlLongTermToken": "<DATALAKE_LONGTERM_TOKEN>"
 }
 ```
 

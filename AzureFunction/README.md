@@ -32,12 +32,11 @@ The full instructions can be found in [INSTALL.md](INSTALL.md)
 
 ```json
 {
-  "dtlUsername": "<DATALAKE_USERNAME>",
-  "dtlPassword": "<DATALAKE_PASSWORD>"
+  "dtlLongTermToken": "<DATALAKE_LONGTERM_TOKEN>"
 }
 ```
 
-5. Iy you plan to use a certificate for Azure authentication. Generate a new certificate with the name "cert" and upload the public key in the app registration.
+5. If you plan to use a certificate for Azure authentication. Generate a new certificate with the name "cert" and upload the public key in the app registration.
 6. Create an Azure Function in your Azure subscription, this needs to be a Linux based Python 3.8+ function.
 7. Modify config.py to your needs.
 8. Upload the code to your Azure Function.

@@ -16,7 +16,10 @@ datalake_queries = [
 add_score_labels = True
 
 # Add Datalake threat entities (subcategories) as labels in Azure Sentinel
-add_threat_entities_as_labels = False 
+add_threat_entities_as_labels = True 
 
 # Logger config
 verbose_log = False
+
+# Add Datalake threat tags as labels in Azure Sentinel
+add_threat_tags_as_labels = True
