@@ -32,9 +32,12 @@ The full instructions can be found in [INSTALL.md](INSTALL.md)
 
 ```json
 {
-  "dtlLongTermToken": "<DATALAKE_LONGTERM_TOKEN>"
+  "dtlLongTermToken": "<DATALAKE_LONGTERM_TOKEN>",
+    "dtlEnvironment":"<prod|preprod>"
 }
 ```
+If `dtlEnvironment` is not set, "prod" is the default value
+
 
 5. If you plan to use a certificate for Azure authentication. Generate a new certificate with the name "cert" and upload the public key in the app registration.
 6. Create an Azure Function in your Azure subscription, this needs to be a Linux based Python 3.8+ function.

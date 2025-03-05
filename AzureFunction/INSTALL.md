@@ -70,9 +70,11 @@ The combined value that should be stored in the Keyvault, is as follows, where t
 
 ```json
 {
-  "dtlLongTermToken": "<DATALAKE_LONGTERM_TOKEN>"
+  "dtlLongTermToken": "<DATALAKE_LONGTERM_TOKEN>",
+  "dtlEnvironment":"<prod|preprod>"
 }
 ```
+If `dtlEnvironment` is not set, "prod" is the default value
 
 4. (Only if using a certificate) Generate a new certificate for app registration.
    1. Under Objects click Certificates and create a new certificate
@@ -88,7 +90,7 @@ The combined value that should be stored in the Keyvault, is as follows, where t
 
 ## Function
 
-This is how the create the Azure Function app.
+This is how to create the Azure Function app:
 
 ### Create the Azure Function in the Azure Portal
 
