@@ -1,5 +1,4 @@
 import config
-from AzureFunction.Datalake2Sentinel.Datalake2Sentinel import Datalake2Sentinel
 from AzureFunction.Datalake2Sentinel.logger import Logger
 from AzureFunction.Datalake2Sentinel.launch import main
 from dotenv import load_dotenv

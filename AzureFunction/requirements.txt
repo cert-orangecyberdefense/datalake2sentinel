@@ -8,7 +8,6 @@ requests
 schedule
 stix2
 wheel
-asyncio
 
 # Azure specifics
 azure-keyvault-secrets

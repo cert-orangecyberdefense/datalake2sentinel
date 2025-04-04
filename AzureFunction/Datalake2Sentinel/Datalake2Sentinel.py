@@ -1,7 +1,6 @@
 import asyncio
 import json
 import time
-import os
 import uuid
 import ipaddress
 import requests
@@ -32,7 +31,7 @@ class Datalake2Sentinel:
         self.clientId = tenant["clientId"]
         self.tenantId = tenant["tenantId"]
         self.clientCredential = (
-            certificate if certificate else [tenant["clientCredential"]],
+            certificate if certificate else tenant["clientCredential"]
         )
         self.workspaceId = tenant["workspaceId"]
         self.dtlQueries = getattr(config, "datalake_queries", [])
@@ -148,6 +147,7 @@ class Datalake2Sentinel:
                                     + threat.get("threat_hashkey"),
                                 )
                             ),
+                            name=threat.get("atom_value"),
                             pattern=self._create_stix_pattern(
                                 threat.get("atom_value"),
                                 threat.get("atom_type"),
