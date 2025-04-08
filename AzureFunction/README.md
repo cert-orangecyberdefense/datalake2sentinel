@@ -17,7 +17,7 @@ The full instructions can be found in [INSTALL.md](INSTALL.md)
 
 1. Create an app registration in the same Microsoft tenant where the Sentinel instance resides. The app requires Microsoft Sentinel Contributor assigned on the workspace.
 2. Create a Keyvault in your Azure subscription
-3. Add a new secret with the name "tenant" with the following value :
+3. Add a new secret named "tenant", and set its value to those four credentials:
 
 ```json
 {
@@ -28,13 +28,16 @@ The full instructions can be found in [INSTALL.md](INSTALL.md)
 }
 ```
 
-4. Add a new secret with the name "datalake" and the value of your Datalake credentials as example
+4. Add a new secret named "datalake", and set its value to your Datalake long-term token and your working environment in a json format:
 
 ```json
 {
-  "dtlLongTermToken": "<DATALAKE_LONGTERM_TOKEN>"
+  "dtlLongTermToken": "<DATALAKE_LONGTERM_TOKEN>",
+  "dtlEnvironment":"<prod|preprod>"
 }
 ```
+If `dtlEnvironment` is not set, "prod" is the default value
+
 
 5. If you plan to use a certificate for Azure authentication. Generate a new certificate with the name "cert" and upload the public key in the app registration.
 6. Create an Azure Function in your Azure subscription, this needs to be a Linux based Python 3.8+ function.

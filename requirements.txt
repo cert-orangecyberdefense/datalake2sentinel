@@ -1,14 +1,18 @@
-asyncio
-black
-datalake-scripts
+# Core
+datalake-scripts==3.0.0rc3
 datetime
 ipaddress
 msal
-pytest
-pytest-asyncio
-python-dotenv
 ratelimit
 requests
 schedule
 stix2
 wheel
+
+# Local
+python-dotenv
+
+# Tests
+black
+pytest
+pytest-asyncio

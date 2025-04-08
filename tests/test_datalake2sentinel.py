@@ -1,10 +1,11 @@
 import pytest
 import json
-from core import _build_logger
-from Datalake2Sentinel import Datalake2Sentinel
+import tests.test_config as config
+from AzureFunction.Datalake2Sentinel.logger import Logger
+from AzureFunction.Datalake2Sentinel.Datalake2Sentinel import Datalake2Sentinel
 from unittest import mock
 
-logger = _build_logger()
+logger = Logger._create_logger(config)
 
 ipv4 = "0.0.0.0"
 ipv6 = "2001:0db8:85a3:0000:0000:8a2e:0370:7334"
@@ -29,7 +30,8 @@ bs_results = [
             ".hashes.sha256",
             "threat_scores",
             "threat_types",
-            "subcategories",
+            "threat_entities",
+            "tags",
         ],
         "for_stix_export": False,
         "task_uuid": "fbdd3bdf-532d-457c-a9e3-21768d59aefe",
@@ -48,6 +50,7 @@ bs_results = [
                     "OCD - Threat pattern:Command and Control [C2]",
                     "Tool:Cobalt Strike - S0154",
                 ],
+                ["tag1", "tag2"],
             ],
             [
                 "ip",
@@ -83,7 +86,23 @@ bs_results = [
     }
 ]
 
-datalake2Sentinel = Datalake2Sentinel(logger=logger)
+datalake = {
+    "dtlLongTermToken": "long-term-token",
+    "dtlEnvironment": "prod",
+}
+tenant = {
+    "clientId": "client-id",
+    "tenantId": "tenant-id",
+    "clientCredential": "client-credential",
+    "workspaceId": "workspace-id",
+}
+datalake2Sentinel = Datalake2Sentinel(
+    logger=logger,
+    tenant=tenant,
+    certificate=None,
+    datalake=datalake,
+    config=config,
+)
 
 
 def test_create_stix_pattern():
@@ -125,10 +144,9 @@ def test_create_stix_pattern():
         )
         == "[file:hashes.MD5 = '098f6bcd4621d373cade4e832627b4f6' OR file:hashes.SHA1 = 'a94a8fe5ccb19ba61c4c0873d391e987982fbbd3' OR file:hashes.SHA256 = '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08']"
     )
-    assert (
+    with pytest.raises(Exception) as e:
         datalake2Sentinel._create_stix_pattern(fqdn, "fqdn", "", "", "")
-        == "[domain-name:value = 'www.google.com']"
-    )
+        assert "unknown" in str(e)
     with pytest.raises(Exception) as e:
         datalake2Sentinel._create_stix_pattern(".", "test", "", "", "")
         assert "unknown" in str(e)
@@ -138,13 +156,14 @@ def test_create_stix_labels():
     input_label = "query_label"
     threat_types = ["malware", "hack", "phishing"]
     threat_scores = [93, 1, 0]
-    subcategories = [
+    threat_entities = [
         "OCD - Threat pattern:Command and Control [C2]",
         "Tool:Cobalt Strike - S0154",
     ]
+    threat_tags = None
 
     assert datalake2Sentinel._create_stix_labels(
-        input_label, threat_types, threat_scores, subcategories
+        input_label, threat_types, threat_scores, threat_entities, threat_tags
     ) == [
         "query_label",
         "OCD - Threat pattern:Command and Control [C2]",
