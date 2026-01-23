@@ -18,7 +18,7 @@ add_threat_tags_as_labels = True
 
 # Logger config
 verbose_log = False
-# Optionnal Configuration for the local use only
-# Cronicity of the integration (in hours), dafult values are False and 1
+# Optional Configuration for the local use only
+# Cron schedule of the integration (in hours), default values are False and 1
 #run_as_cron = False
 #upload_frequency = 1 
