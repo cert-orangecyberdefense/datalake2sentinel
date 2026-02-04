@@ -42,6 +42,9 @@ class Datalake2Sentinel:
         self.dtlAddThreatTagsLabels = getattr(
             config, "add_threat_tags_as_labels", False
         )
+        self.dtlThreatDownloadTimeout = getattr(
+            config, "threats_download_timeout", 15 * 60
+        )
 
         self.logger.debug(
             f"""
@@ -86,7 +89,11 @@ class Datalake2Sentinel:
             task = dtl.BulkSearch.create_task(
                 query_hash=query["query_hash"], query_fields=query_fields
             )
-            coroutines.append(task.download_async(output=Output.JSON))
+            coroutines.append(
+                task.download_async(
+                    output=Output.JSON, timeout=self.dtlThreatDownloadTimeout
+                )
+            )
 
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)

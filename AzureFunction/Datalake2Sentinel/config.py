@@ -7,11 +7,11 @@ datalake_queries = [
   }
 ]
 
-# Add Datalake scores as labels in Azure Sentinel 
+# Add Datalake scores as labels in Azure Sentinel
 add_score_labels = True
 
 # Add Datalake threat entities as labels in Azure Sentinel
-add_threat_entities_as_labels = True 
+add_threat_entities_as_labels = True
 
 # Add Datalake threat tags as labels in Azure Sentinel
 add_threat_tags_as_labels = True
@@ -20,5 +20,8 @@ add_threat_tags_as_labels = True
 verbose_log = False
 # Optional Configuration for the local use only
 # Cron schedule of the integration (in hours), default values are False and 1
-#run_as_cron = False
-#upload_frequency = 1 
+# run_as_cron = False
+# upload_frequency = 1
+
+# Timeout for threats download tasks (in seconds)
+threats_download_timeout = 30 * 60
