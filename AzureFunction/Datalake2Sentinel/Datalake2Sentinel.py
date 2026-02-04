@@ -331,7 +331,7 @@ class Datalake2Sentinel:
     @limits(calls=REQUESTS_PER_MINUTE, period=60)
     def _send_request(self, indicators, access_token):
         workspace_id = self.workspaceId
-        upload_indicator_url = f"https://sentinelus.azure-api.net/workspaces/{workspace_id}/threatintelligenceindicators:upload?api-version=2022-07-01"
+        upload_indicator_url = f"https://api.ti.sentinel.azure.com/workspaces/{workspace_id}/threat-intelligence-stix-objects:upload?api-version=2024-02-01-preview"
         headers = {
             "Authorization": f"Bearer {access_token}",
             "Content-Type": "application/json",
@@ -339,7 +339,7 @@ class Datalake2Sentinel:
 
         data_to_upload = {
             "sourcesystem": SOURCE_SYSTEM_NAME,
-            "indicators": [
+            "stixobjects": [
                 json.loads(indicator.serialize()) for indicator in indicators
             ],
         }
