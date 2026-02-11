@@ -42,6 +42,9 @@ class Datalake2Sentinel:
         self.dtlAddThreatTagsLabels = getattr(
             config, "add_threat_tags_as_labels", False
         )
+        self.dtlThreatDownloadTimeout = getattr(
+            config, "threats_download_timeout", 15 * 60
+        )
 
         self.logger.debug(
             f"""
@@ -86,7 +89,11 @@ class Datalake2Sentinel:
             task = dtl.BulkSearch.create_task(
                 query_hash=query["query_hash"], query_fields=query_fields
             )
-            coroutines.append(task.download_async(output=Output.JSON))
+            coroutines.append(
+                task.download_async(
+                    output=Output.JSON, timeout=self.dtlThreatDownloadTimeout
+                )
+            )
 
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
@@ -324,7 +331,7 @@ class Datalake2Sentinel:
     @limits(calls=REQUESTS_PER_MINUTE, period=60)
     def _send_request(self, indicators, access_token):
         workspace_id = self.workspaceId
-        upload_indicator_url = f"https://sentinelus.azure-api.net/workspaces/{workspace_id}/threatintelligenceindicators:upload?api-version=2022-07-01"
+        upload_indicator_url = f"https://api.ti.sentinel.azure.com/workspaces/{workspace_id}/threat-intelligence-stix-objects:upload?api-version=2024-02-01-preview"
         headers = {
             "Authorization": f"Bearer {access_token}",
             "Content-Type": "application/json",
@@ -332,7 +339,7 @@ class Datalake2Sentinel:
 
         data_to_upload = {
             "sourcesystem": SOURCE_SYSTEM_NAME,
-            "indicators": [
+            "stixobjects": [
                 json.loads(indicator.serialize()) for indicator in indicators
             ],
         }
