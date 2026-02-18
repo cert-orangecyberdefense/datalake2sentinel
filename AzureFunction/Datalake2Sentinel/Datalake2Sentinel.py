@@ -1,24 +1,11 @@
 import asyncio
 import json
 import time
-import os
-import Datalake2Sentinel.config as config
 import uuid
 import ipaddress
 import requests
 from ratelimit import limits, sleep_and_retry
-from Datalake2Sentinel.constants import (
-    ATOM_TYPE,
-    ATOM_VALUE,
-    THREAT_HASHKEY,
-    THREAT_SCORES,
-    TAGS,
-    THREAT_TYPES,
-    HASHES_MD5,
-    HASHES_SHA1,
-    HASHES_SHA256,
-    LAST_UPDATED,
-    SUBCATEGORIES,
+from .constants import (
     AZURE_SCOPE,
     AZURE_AUTHORITY_URL,
     BATCH_SIZE,
@@ -34,16 +21,42 @@ from datalake import Datalake, Output
 class Datalake2Sentinel:
     """
     A class that handles all the logic of the connector: getting the iocs from
-    Datalake, transform them into STIX indicator's object and send them to Sentinel.
+    Datalake, transform them into STIX indicator's objects and send them to Sentinel.
     """
 
-    def __init__(self, logger, tenant, credential, datalake):
+    def __init__(self, logger, tenant, certificate, datalake, config):
         self.logger = logger
-        self.dtlLongTermToken = datalake["dtlLongTermToken"]
+        self.dtlLongTermToken = datalake.get("dtlLongTermToken")
+        self.dtlEnvironment = datalake.get("dtlEnvironment", "prod")
         self.clientId = tenant["clientId"]
         self.tenantId = tenant["tenantId"]
-        self.credential = credential
+        self.clientCredential = (
+            certificate if certificate else tenant["clientCredential"]
+        )
         self.workspaceId = tenant["workspaceId"]
+        self.dtlQueries = getattr(config, "datalake_queries", [])
+        self.dtlAddScoreLabels = getattr(config, "add_score_labels", True)
+        self.dtlAddThreatEntitiesLabels = getattr(
+            config, "add_threat_entities_as_labels", False
+        )
+        self.dtlAddThreatTagsLabels = getattr(
+            config, "add_threat_tags_as_labels", False
+        )
+        self.dtlThreatDownloadTimeout = getattr(
+            config, "threats_download_timeout", 15 * 60
+        )
+
+        self.logger.debug(
+            f"""
+                Init of Datlake2Sentinel done
+                on tenant {self.tenantId} and workspace {self.workspaceId} for client {self.clientId} 
+                with options for Datalake set as :
+                - nb of queries : {len(self.dtlQueries)}
+                - scores labels : {self.dtlAddScoreLabels} 
+                - threat entities labels : {self.dtlAddThreatEntitiesLabels}
+                - threat tags labels: {self.dtlAddThreatTagsLabels}
+            """
+        )
 
     def _getDalakeThreats(self):
         query_fields = [
@@ -56,17 +69,19 @@ class Datalake2Sentinel:
             ".hashes.sha256",
             "threat_scores",
         ]
-        if config.add_score_labels:
+        if self.dtlAddScoreLabels:
             query_fields.append("threat_types")
-        if config.add_threat_entities_as_labels:
-            query_fields.append("subcategories")
-        if config.add_threat_tags_as_labels:
+        if self.dtlAddThreatEntitiesLabels or self.dtlAddThreatTagsLabels:
+            query_fields.append("threat_entities")
             query_fields.append("tags")
 
-        dtl = Datalake(longterm_token=self.dtlLongTermToken)
+        dtl = Datalake(
+            longterm_token=self.dtlLongTermToken,
+            env=self.dtlEnvironment,
+        )
         coroutines = []
 
-        for query in config.datalake_queries:
+        for query in self.dtlQueries:
             self.logger.info(
                 f"Creating BulkSearch for {query['query_hash']} query_hash ..."
             )
@@ -74,7 +89,11 @@ class Datalake2Sentinel:
             task = dtl.BulkSearch.create_task(
                 query_hash=query["query_hash"], query_fields=query_fields
             )
-            coroutines.append(task.download_async(output=Output.JSON))
+            coroutines.append(
+                task.download_async(
+                    output=Output.JSON, timeout=self.dtlThreatDownloadTimeout
+                )
+            )
 
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
@@ -91,18 +110,38 @@ class Datalake2Sentinel:
 
         return results
 
+    def _return_threat_as_dict(self, threat):
+        return {
+            "atom_type": threat[0],
+            "atom_value": threat[1],
+            "threat_hashkey": threat[2],
+            "last_updated": threat[3],
+            ".hashes.md5": threat[4],
+            ".hashes.sha1": threat[5],
+            ".hashes.sha256": threat[6],
+            "threat_scores": threat[7],
+            "threat_types": threat[8] if self.dtlAddScoreLabels else None,
+            "threat_entities": (
+                threat[len(threat) - 2] if self.dtlAddThreatEntitiesLabels else None
+            ),
+            "threat_tags": (
+                threat[len(threat) - 1] if self.dtlAddThreatEntitiesLabels else None
+            ),
+        }
+
     def _generateStixIndicators(self, bulk_searches_results):
         stix_indicators = []
         self.logger.info("Generating STIX indicators ...")
 
         for index, bulk_search_result in enumerate(bulk_searches_results):
             query_hash = bulk_search_result["advanced_query_hash"]
-            input_label = config.datalake_queries[index]["label"]
+            input_label = self.dtlQueries[index]["label"]
             valid_until = datetime.now() + timedelta(
-                hours=config.datalake_queries[index]["valid_until"]
+                hours=self.dtlQueries[index]["valid_until"]
             )
 
             for threat in bulk_search_result["results"]:
+                threat = self._return_threat_as_dict(threat)
                 try:
                     stix_indicators.append(
                         Indicator(
@@ -110,41 +149,35 @@ class Datalake2Sentinel:
                             id="indicator--{}".format(
                                 uuid.uuid5(
                                     uuid.NAMESPACE_OID,
-                                    query_hash + input_label + threat[THREAT_HASHKEY],
+                                    query_hash
+                                    + input_label
+                                    + threat.get("threat_hashkey"),
                                 )
                             ),
-                            name=threat[ATOM_VALUE],
+                            name=threat.get("atom_value"),
                             pattern=self._create_stix_pattern(
-                                threat[ATOM_VALUE],
-                                threat[ATOM_TYPE],
-                                threat[HASHES_MD5],
-                                threat[HASHES_SHA1],
-                                threat[HASHES_SHA256],
+                                threat.get("atom_value"),
+                                threat.get("atom_type"),
+                                threat.get(".hashes.md5"),
+                                threat.get(".hashes.sha1"),
+                                threat.get(".hashes.sha256"),
                             ),
                             pattern_type="stix",
-                            valid_from=threat[LAST_UPDATED],
+                            valid_from=threat.get("last_updated"),
                             valid_until=valid_until.isoformat() + "Z",
                             labels=self._create_stix_labels(
                                 input_label=input_label,
-                                threat_types=(
-                                    threat[THREAT_TYPES] if THREAT_TYPES else None
-                                ),
-                                threat_scores=(
-                                    threat[THREAT_SCORES]
-                                    if config.add_score_labels
-                                    else None
-                                ),
-                                subcategories=(
-                                    threat[SUBCATEGORIES] if SUBCATEGORIES else None
-                                ),
-                                tags=(threat[TAGS] if TAGS else None),
+                                threat_types=threat.get("threat_types"),
+                                threat_scores=threat.get("threat_scores"),
+                                threat_entities=threat.get("threat_entities"),
+                                threat_tags=threat.get("threat_tags"),
                             ),
-                            confidence=max(threat[THREAT_SCORES]),
+                            confidence=max(threat.get("threat_scores")),
                             external_references=[
                                 {
                                     "source_name": "Orange Cyberdefense",
                                     "url": "https://datalake.cert.orangecyberdefense.com/gui/threat/{}".format(
-                                        threat[THREAT_HASHKEY]
+                                        threat.get("threat_hashkey")
                                     ),
                                 }
                             ],
@@ -155,8 +188,7 @@ class Datalake2Sentinel:
                         f"An error occured when creating stix indicator for threat {threat} : {e}"
                     )
                 except Exception as e:
-                    if "unknown" in str(e):
-                        self.logger.error(f"{e}")
+                    self.logger.error(f"{e}")
 
         self.logger.info("STIX indicators generated")
 
@@ -167,7 +199,7 @@ class Datalake2Sentinel:
     ):
         pattern_format = "[{}:{} = {}]"
 
-        if atom_type == "domain" or atom_type == "fqdn":
+        if atom_type == "domain":
             return pattern_format.format("domain-name", "value", repr(atom_value))
         elif atom_type == "url":
             return pattern_format.format("url", "value", repr(atom_value))
@@ -199,15 +231,18 @@ class Datalake2Sentinel:
             return f"[{pattern}]"
 
         else:
-            raise Exception(f"Atom type '{atom_type}' is unknown or is not handle")
+            raise Exception(f"Atom type '{atom_type}' is unknown or is not handled")
 
     def _create_stix_labels(
-        self, input_label, threat_types, threat_scores, subcategories, tags
+        self, input_label, threat_types, threat_scores, threat_entities, threat_tags
     ):
         stix_labels = [input_label]
 
-        if subcategories:
-            stix_labels.extend(subcategories)
+        if threat_entities:
+            stix_labels.extend(threat_entities)
+
+        if threat_tags:
+            stix_labels.extend(threat_tags)
 
         if threat_types:
             max_score = max(threat_scores) - (max(threat_scores) % 10)
@@ -221,9 +256,6 @@ class Datalake2Sentinel:
                     )
                 )
 
-        if tags:
-            stix_labels.extend(tags)
-
         return stix_labels
 
     def _getAzureAppToken(self):
@@ -231,11 +263,12 @@ class Datalake2Sentinel:
 
         client_id = self.clientId
         tenant_id = self.tenantId
+        client_credential = self.clientCredential
 
         app = ConfidentialClientApplication(
             client_id=client_id,
             authority=AZURE_AUTHORITY_URL + tenant_id,
-            client_credential=self.credential,
+            client_credential=client_credential,
         )
 
         acquire_tokens_result = app.acquire_token_for_client(scopes=[AZURE_SCOPE])
@@ -258,6 +291,7 @@ class Datalake2Sentinel:
         self.logger.debug(f"Uploading {num_batches} batches to Azure Sentinel ...")
 
         batch_index = 0
+        retry = 0
 
         while batch_index < num_batches:
             # Extract the batch
@@ -268,15 +302,25 @@ class Datalake2Sentinel:
             # Send the request
             response = self._send_request(batch, access_token)
 
-            # TODO: Manage the cases 500, 504 and 503
-            # When hitting the limit wait
             if response.status_code == 429:
                 self.logger.debug(
-                    f"Wait for {response.headers['Retry-After']} seconds and retry batch"
+                    f"Error HTTP 429. Rate Limit reached. Waiting for {response.headers['Retry-After']} seconds before retrying batch"
                 )
                 time.sleep(int(response.headers["Retry-After"]))
+            elif retry == 0 and response.status_code in (504, 503):
+                self.logger.warning(
+                    f"Error HTTP {response.status_code}. Possible temporary issue. Waiting for 1 minute before retrying once"
+                )
+                time.sleep(60)
+                retry += 1
             else:
+                if response.status_code != 200:
+                    # We already retried once or error unhandled yet, we log and go to next batch
+                    self.logger.error(
+                        f"Error HTTP {response.status_code} occured for current batch, text/reason : {response.text} and {response.reason}"
+                    )
                 batch_index = batch_index + 1
+                retry = 0
 
         self.logger.debug(
             f"Successful upload of {num_batches} batches to Azure Sentinel"
@@ -287,7 +331,7 @@ class Datalake2Sentinel:
     @limits(calls=REQUESTS_PER_MINUTE, period=60)
     def _send_request(self, indicators, access_token):
         workspace_id = self.workspaceId
-        upload_indicator_url = f"https://sentinelus.azure-api.net/workspaces/{workspace_id}/threatintelligenceindicators:upload?api-version=2022-07-01"
+        upload_indicator_url = f"https://api.ti.sentinel.azure.com/workspaces/{workspace_id}/threat-intelligence-stix-objects:upload?api-version=2024-02-01-preview"
         headers = {
             "Authorization": f"Bearer {access_token}",
             "Content-Type": "application/json",
@@ -295,7 +339,7 @@ class Datalake2Sentinel:
 
         data_to_upload = {
             "sourcesystem": SOURCE_SYSTEM_NAME,
-            "indicators": [
+            "stixobjects": [
                 json.loads(indicator.serialize()) for indicator in indicators
             ],
         }

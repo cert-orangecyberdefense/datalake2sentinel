@@ -1,7 +1,5 @@
-azure-keyvault-secrets
-azure-identity
-black
-datalake-scripts
+# Core
+datalake-scripts==3.0.0rc7
 datetime
 ipaddress
 msal
@@ -10,3 +8,7 @@ requests
 schedule
 stix2
 wheel
+
+# Azure specifics
+azure-keyvault-secrets
+azure-identity
