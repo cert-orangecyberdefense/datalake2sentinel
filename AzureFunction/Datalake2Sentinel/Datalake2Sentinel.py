@@ -4,6 +4,7 @@ import time
 import uuid
 import ipaddress
 import requests
+import logging
 from ratelimit import limits, sleep_and_retry
 from .constants import (
     AZURE_SCOPE,
@@ -16,6 +17,7 @@ from msal import ConfidentialClientApplication
 from datetime import datetime, timedelta
 from stix2 import Indicator, exceptions
 from datalake import Datalake, Output
+from .exceptions import DatalakeError, DatalakeConnectionError, DatalakeAuthenticationError, DatalakePermissionError
 
 
 class Datalake2Sentinel:
@@ -46,19 +48,44 @@ class Datalake2Sentinel:
             config, "threats_download_timeout", 15 * 60
         )
 
+        self.dtl = Datalake(
+            longterm_token=self.dtlLongTermToken,
+            env=self.dtlEnvironment,
+            log_level=logging.ERROR
+        )
+
+        try:
+            self.currentUserInfo = self.dtl.MyAccount.me()
+        except ConnectionError as e:
+            raise DatalakeConnectionError(f"Unable to connect to Datalake: {e}")
+        except ValueError as e:
+            raise DatalakeAuthenticationError(f"Authentication error: {e}")
+        except Exception as e:
+            raise DatalakeError(f"Unexpected error: {e}")
+
         self.logger.debug(
             f"""
                 Init of Datlake2Sentinel done
-                on tenant {self.tenantId} and workspace {self.workspaceId} for client {self.clientId} 
+                on tenant {self.tenantId} and workspace {self.workspaceId} for client {self.clientId}
                 with options for Datalake set as :
                 - nb of queries : {len(self.dtlQueries)}
-                - scores labels : {self.dtlAddScoreLabels} 
+                - scores labels : {self.dtlAddScoreLabels}
                 - threat entities labels : {self.dtlAddThreatEntitiesLabels}
                 - threat tags labels: {self.dtlAddThreatTagsLabels}
             """
         )
 
+    def _checkpermission(self, name):
+        permissions = self.currentUserInfo["role"]["administration_permissions"]
+        for permission in permissions:
+            if name == permission["name"]:
+                return True
+        return False
+
     def _getDalakeThreats(self):
+        if not self._checkpermission("bulk_search"):
+            raise DatalakePermissionError("User doesn't have bulk_search permission. Please check your datalake credentials and permissions")
+
         query_fields = [
             "atom_type",
             "atom_value",
@@ -75,38 +102,42 @@ class Datalake2Sentinel:
             query_fields.append("threat_entities")
             query_fields.append("tags")
 
-        dtl = Datalake(
-            longterm_token=self.dtlLongTermToken,
-            env=self.dtlEnvironment,
-        )
         coroutines = []
+        results = []
 
-        for query in self.dtlQueries:
-            self.logger.info(
-                f"Creating BulkSearch for {query['query_hash']} query_hash ..."
-            )
-
-            task = dtl.BulkSearch.create_task(
-                query_hash=query["query_hash"], query_fields=query_fields
-            )
-            coroutines.append(
-                task.download_async(
-                    output=Output.JSON, timeout=self.dtlThreatDownloadTimeout
-                )
-            )
-
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
         try:
-            results = loop.run_until_complete(asyncio.gather(*coroutines))
-            for result in results:
+            for query in self.dtlQueries:
                 self.logger.info(
-                    "Get {} threats from Datalake with {} query_hash".format(
-                        result["count"], result["advanced_query_hash"]
+                    f"Creating BulkSearch for {query['query_hash']} query_hash ..."
+                )
+
+                task = self.dtl.BulkSearch.create_task(
+                    query_hash=query["query_hash"], query_fields=query_fields
+                )
+                coroutines.append(
+                    task.download_async(
+                        output=Output.JSON, timeout=self.dtlThreatDownloadTimeout
                     )
                 )
-        finally:
-            loop.close()
+
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                results = loop.run_until_complete(asyncio.gather(*coroutines))
+                for result in results:
+                    self.logger.info(
+                        "Get {} threats from Datalake with {} query_hash".format(
+                            result["count"], result["advanced_query_hash"]
+                        )
+                    )
+            finally:
+                loop.close()
+        except TimeoutError:
+            raise DatalakeError(
+                f"Download timeout exceeded {self.dtlThreatDownloadTimeout}s"
+            )
+        except Exception as e:
+            raise DatalakeError(f"Failed to retrieve threats: {e}")
 
         return results
 
@@ -323,9 +354,9 @@ class Datalake2Sentinel:
                 retry = 0
 
         self.logger.debug(
-            f"Successful upload of {num_batches} batches to Azure Sentinel"
+            f"Successful upload of {batch_index} batches to Azure Sentinel"
         )
-        self.logger.info("Successful upload of Indicators to Azure Sentinel")
+
 
     @sleep_and_retry
     @limits(calls=REQUESTS_PER_MINUTE, period=60)
@@ -360,7 +391,12 @@ class Datalake2Sentinel:
         return response
 
     def uploadIndicatorsToSentinel(self):
-        bulk_searches_results = self._getDalakeThreats()
+        try:
+            bulk_searches_results = self._getDalakeThreats()
+        except DatalakeError as e:
+            self.logger.error(e)
+            return
+
         indicators = self._generateStixIndicators(bulk_searches_results)
         self._batch_post_requests(indicators)
 
