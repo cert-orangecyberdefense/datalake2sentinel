@@ -96,13 +96,18 @@ tenant = {
     "clientCredential": "client-credential",
     "workspaceId": "workspace-id",
 }
-datalake2Sentinel = Datalake2Sentinel(
-    logger=logger,
-    tenant=tenant,
-    certificate=None,
-    datalake=datalake,
-    config=config,
-)
+
+with mock.patch("AzureFunction.Datalake2Sentinel.Datalake2Sentinel.Datalake") as MockDatalake:
+    MockDatalake.return_value.MyAccount.me.return_value = {
+        "role": {"administration_permissions": [{"name": "bulk_search"}]}
+    }
+    datalake2Sentinel = Datalake2Sentinel(
+        logger=logger,
+        tenant=tenant,
+        certificate=None,
+        datalake=datalake,
+        config=config,
+    )
 
 
 def test_create_stix_pattern():
