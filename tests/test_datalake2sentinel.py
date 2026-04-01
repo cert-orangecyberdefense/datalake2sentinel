@@ -1,11 +1,10 @@
 import pytest
 import json
-import tests.test_config as config
 from AzureFunction.Datalake2Sentinel.logger import Logger
 from AzureFunction.Datalake2Sentinel.Datalake2Sentinel import Datalake2Sentinel
 from unittest import mock
 
-logger = Logger._create_logger(config)
+logger = Logger._create_logger()
 
 ipv4 = "0.0.0.0"
 ipv6 = "2001:0db8:85a3:0000:0000:8a2e:0370:7334"
@@ -103,10 +102,7 @@ with mock.patch("AzureFunction.Datalake2Sentinel.Datalake2Sentinel.Datalake") as
     }
     datalake2Sentinel = Datalake2Sentinel(
         logger=logger,
-        tenant=tenant,
         certificate=None,
-        datalake=datalake,
-        config=config,
     )
 
 
