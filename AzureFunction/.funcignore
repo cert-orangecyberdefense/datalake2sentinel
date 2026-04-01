@@ -1,4 +1,12 @@
 .git*
 local.settings.json
-test
-.venv
+
+
+# Python
+__pycache__/
+.pytest_cache/
+.venv/
+
+# Doc
+README.md
+INSTALL.md

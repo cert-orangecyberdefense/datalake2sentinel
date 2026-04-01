@@ -1,0 +1,21 @@
+# Docker & build
+Dockerfile
+.dockerignore
+Makefile
+
+# VCS & IDE
+.git/
+.gitignore
+.vscode/
+.idea/
+
+# Docs & templates
+README.md
+CONTRIBUTING.md
+.env.sample
+
+# Python cache
+__pycache__/
+.python_packages
+*.pytest_cache
+*.venv
