@@ -10,8 +10,7 @@ The Datalake to Microsoft Sentinel integration allows you to push threat indicat
 
 First of all, you need to have a **Datalake account**. If so, follow the steps below if you want to run the **datalake2sentinel** connector in a dedicate server.
 
-* Copy the file `AzureFunction/Datalake2Sentinel/config.py` as `config.py` and adapt the values according to your usage. This file is used to configure the **Datalake API requests** which will be executed and the **behavior** of the Datalake2Sentinel integration.
-* Rename the file `.env.default` to `.env` and replace the environment variables with yours. This file is used to define all the credentials for **Datalake API** and **Azure**.
+* Rename the file `.env.sample` to `.env` and replace the environment variables with yours. This file is used to define all the credentials for **Datalake API** and **Azure**.
 
 
 ### Usage

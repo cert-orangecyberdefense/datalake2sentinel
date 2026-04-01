@@ -31,52 +31,33 @@ This is how to create and configure the app registration:
 
 ## Keyvault
 
-This is how to create a Key Vault and store the secret value in it:
+This is how to create a Key Vault and store the secret values in it:
 
 1. Go to the service _Key vaults_
 2. Click _Create key vault_
 3. Configure the Key vault as you wish, pay attention to the region in which it is stored, for instance "France Central"
 
-### Formatting the Secret value
+### Required secrets in Key Vault
 
-From above App Registration, 4 elements are required to store in Keyvault a value in the correct format to make the script able to properly make use of the app.
+From the App Registration, the Azure values are:
 
 - **TENANT_ID** = the value stated at _Directory (tenant) ID_ in the App Registration overview
 - **CLIENT_ID** = the value stated at _Application (client) ID_ in the App Registration overview
-- (Only if using a secret) **CLIENT_CREDENTIAL** = the value you copied in the last step in creating the App Registration
+- **CLIENT_CREDENTIAL** = the value of the generated Client Secret (only if using client secret authentication)
 - **WORKSPACE_ID** = the workspace id of the Sentinel workspace you want to write to
 
-The combined value that should be stored in the Keyvault, is as follows, where the variable names including the <> should be replaced by above 4 values.
+1. After creating the Key vault, under Objects click Secrets and create the following secrets:
 
-```json
-{
-  "clientId": "<CLIENT_ID>",
-  "tenantId": "<TENANT_ID>",
-  "clientCredential": "<CLIENT_CREDENTIAL>",
-  "workspaceId": "<WORKSPACE_ID>"
-}
+```
+CLIENT-ID=<CLIENT_ID>
+TENANT-ID=<TENANT_ID>
+CLIENT-CREDENTIAL=<CLIENT_CREDENTIAL>
+WORKSPACE-ID=<WORKSPACE_ID>
+DATALAKE-TOKEN=<DATALAKE_LONGTERM_TOKEN>
+DATALAKE-ENV=<prod|preprod> (optional, defaults to `prod`)
 ```
 
-### Add secrets to the Key Vault
-
-1. After creating the Key vault, under Objects click Keys and create a new key
-2. Enter the values that were copied from App Registration Secrets above
-
-- the name of the key **MUST** be `tenant`
-- The _Secret Value_ will be the formatted secret value you created above
-- Other settings can be left to default values
-
-3. Add a new secret `datalake` with the value the following value
-
-```json
-{
-  "dtlLongTermToken": "<DATALAKE_LONGTERM_TOKEN>",
-  "dtlEnvironment":"<prod|preprod>"
-}
-```
-If `dtlEnvironment` is not set, "prod" is the default value
-
-4. (Only if using a certificate) Generate a new certificate for app registration.
+2. (Only if using a certificate) Generate a new certificate for app registration.
    1. Under Objects click Certificates and create a new certificate
       - Select the Generate method
       - Name it `cert`
@@ -106,13 +87,19 @@ This is how to create the Azure Function app:
 3. Assign the correct RBAC to your Function so that it can access to secrets in Vault.
 
 4. Go back to the Azure Function and click on _Configuration_
-5. Add a new application setting with the name `tenant` and the Key Vault reference string `@Microsoft.KeyVault(SecretUri=https://<keyvaultname>.vault.azure.net/secrets/tenant/)`
-6. Add a new application setting with the name `datalake` and the Key Vault reference string `@Microsoft.KeyVault(SecretUri=https://<keyvaultname>.vault.azure.net/secrets/datalake/)`
-7. (Only if using a certificate) Add a new application setting with the name `certificate` and the Key Vault reference string `@Microsoft.KeyVault(SecretUri=https://<keyvaultname>.vault.azure.net/certificates/cert/)`
-8. Add a new application setting with the name `timerTriggerSchedule`
-   - The `timerTriggerSchedule` takes a cron expression. For more information, see [Timer trigger for Azure Functions](https://learn.microsoft.com/en-us/azure/azure-functions/functions-bindings-timer?tabs=python-v2%2Cin-process&pivots=programming-language-python).
+5. Add the Azure credential application settings as Key Vault references:
+   - `CLIENT_ID`: `@Microsoft.KeyVault(SecretUri=https://<keyvaultname>.vault.azure.net/secrets/CLIENT-ID/)`
+   - `TENANT_ID`: `@Microsoft.KeyVault(SecretUri=https://<keyvaultname>.vault.azure.net/secrets/TENANT-ID/)`
+   - `CLIENT_CREDENTIAL`: `@Microsoft.KeyVault(SecretUri=https://<keyvaultname>.vault.azure.net/secrets/CLIENT-CREDENTIAL/)`
+   - `WORKSPACE_ID`: `@Microsoft.KeyVault(SecretUri=https://<keyvaultname>.vault.azure.net/secrets/WORKSPACE-ID/)`
+6. Add the Datalake application settings as Key Vault references:
+   - `DATALAKE_TOKEN`: `@Microsoft.KeyVault(SecretUri=https://<keyvaultname>.vault.azure.net/secrets/DATALAKE-TOKEN/)`
+   - `DATALAKE_ENV`: `@Microsoft.KeyVault(SecretUri=https://<keyvaultname>.vault.azure.net/secrets/DATALAKE-ENV/)`
+7. (Only if using a certificate) Add a new application setting with the name `CLIENT_CERTIFICATE` and the Key Vault reference string `@Microsoft.KeyVault(SecretUri=https://<keyvaultname>.vault.azure.net/certificates/cert/)`
+8. Add a new application setting with the name `TIMER_TRIGGER_SCHEDULE`
+   - The `TIMER_TRIGGER_SCHEDULE` takes a cron expression. For more information, see [Timer trigger for Azure Functions](https://learn.microsoft.com/en-us/azure/azure-functions/functions-bindings-timer?tabs=python-v2%2Cin-process&pivots=programming-language-python).
    - For example to run once every two hours cron expression: `0 */2 * * *`
-9. Do the same for `log_file` and set it to `/tmp/datalake2sentinel.log`.
+9. Any variable from the [`.env.sample`](../.env.sample) file can be added as an application setting to override its default value (e.g. `LOG_FILE` set to `/tmp/datalake2sentinel.log`).
 10. In some case you need to change the value of env variable `FUNCTIONS_EXTENSION_VERSION` from `~4` to `~3`.
 
 ### Upload the Function Code with Visual Studio Code

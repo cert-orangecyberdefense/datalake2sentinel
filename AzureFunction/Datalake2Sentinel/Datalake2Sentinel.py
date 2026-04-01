@@ -7,11 +7,22 @@ import requests
 import logging
 from ratelimit import limits, sleep_and_retry
 from .constants import (
+    DATALAKE_TOKEN,
+    DATALAKE_ENV,
+    CLIENT_ID,
+    TENANT_ID,
+    CLIENT_CREDENTIAL,
+    WORKSPACE_ID,
+    DATALAKE_QUERIES,
     AZURE_SCOPE,
     AZURE_AUTHORITY_URL,
     BATCH_SIZE,
     REQUESTS_PER_MINUTE,
     SOURCE_SYSTEM_NAME,
+    ADD_SCORE_LABELS,
+    ADD_THREAT_ENTITIES_AS_LABELS,
+    ADD_THREAT_TAGS_AS_LABELS,
+    THREATS_DOWNLOAD_TIMEOUT_SEC
 )
 from msal import ConfidentialClientApplication
 from datetime import datetime, timedelta
@@ -26,27 +37,21 @@ class Datalake2Sentinel:
     Datalake, transform them into STIX indicator's objects and send them to Sentinel.
     """
 
-    def __init__(self, logger, tenant, certificate, datalake, config):
+    def __init__(self, logger, certificate):
         self.logger = logger
-        self.dtlLongTermToken = datalake.get("dtlLongTermToken")
-        self.dtlEnvironment = datalake.get("dtlEnvironment", "prod")
-        self.clientId = tenant["clientId"]
-        self.tenantId = tenant["tenantId"]
+        self.dtlLongTermToken = DATALAKE_TOKEN
+        self.dtlEnvironment = DATALAKE_ENV
+        self.clientId = CLIENT_ID
+        self.tenantId = TENANT_ID
         self.clientCredential = (
-            certificate if certificate else tenant["clientCredential"]
+            certificate if certificate else CLIENT_CREDENTIAL
         )
-        self.workspaceId = tenant["workspaceId"]
-        self.dtlQueries = getattr(config, "datalake_queries", [])
-        self.dtlAddScoreLabels = getattr(config, "add_score_labels", True)
-        self.dtlAddThreatEntitiesLabels = getattr(
-            config, "add_threat_entities_as_labels", False
-        )
-        self.dtlAddThreatTagsLabels = getattr(
-            config, "add_threat_tags_as_labels", False
-        )
-        self.dtlThreatDownloadTimeout = getattr(
-            config, "threats_download_timeout", 15 * 60
-        )
+        self.workspaceId = WORKSPACE_ID
+        self.dtlQueries = json.loads(DATALAKE_QUERIES)
+        self.dtlAddScoreLabels = ADD_SCORE_LABELS
+        self.dtlAddThreatEntitiesLabels = ADD_THREAT_ENTITIES_AS_LABELS
+        self.dtlAddThreatTagsLabels = ADD_THREAT_TAGS_AS_LABELS
+        self.dtlThreatDownloadTimeout = THREATS_DOWNLOAD_TIMEOUT_SEC
 
         self.dtl = Datalake(
             longterm_token=self.dtlLongTermToken,
