@@ -8,6 +8,7 @@ requests
 schedule
 stix2
 wheel
+python-dotenv
 
 # Azure specifics
 azure-keyvault-secrets

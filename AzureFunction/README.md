@@ -17,40 +17,36 @@ The full instructions can be found in [INSTALL.md](INSTALL.md)
 
 1. Create an app registration in the same Microsoft tenant where the Sentinel instance resides. The app requires Microsoft Sentinel Contributor assigned on the workspace.
 2. Create a Keyvault in your Azure subscription
-3. Add a new secret named "tenant", and set its value to those four credentials:
+3. Store the required Azure credentials in Azure Key Vault and expose them to the Function App through Key Vault references:
 
-```json
-{
-  "clientId": "<CLIENT_ID>",
-  "tenantId": "<TENANT_ID>",
-  "clientCredential": "<CLIENT_CREDENTIAL>",
-  "workspaceId": "<WORKSPACE_ID>"
-}
+```
+CLIENT-ID=<CLIENT_ID>
+TENANT-ID=<TENANT_ID>
+CLIENT-CREDENTIAL=<CLIENT_CREDENTIAL>
+WORKSPACE-ID=<WORKSPACE_ID>
 ```
 
-4. Add a new secret named "datalake", and set its value to your Datalake long-term token and your working environment in a json format:
+4. Store the required Datalake settings in Azure Key Vault and expose them to the Function App through Key Vault references:
 
-```json
-{
-  "dtlLongTermToken": "<DATALAKE_LONGTERM_TOKEN>",
-  "dtlEnvironment":"<prod|preprod>"
-}
 ```
-If `dtlEnvironment` is not set, "prod" is the default value
+DATALAKE-TOKEN=<DATALAKE_LONGTERM_TOKEN>
+DATALAKE-ENV=<prod|preprod>
+```
+
+If `DATALAKE_ENV` is not set, `prod` is the default value.
 
 
 5. If you plan to use a certificate for Azure authentication. Generate a new certificate with the name "cert" and upload the public key in the app registration.
 6. Create an Azure Function in your Azure subscription, this needs to be a Linux based Python 3.8+ function.
-7. Modify config.py to your needs.
-8. Upload the code to your Azure Function.
+7. Upload the code to your Azure Function.
 
    - If you are using VSCode, this can be done by clicking the Azure Function folder and selecting "Deploy to Function App", provided you have the Azure Functions extension installed.
    - If using Powershell, you can upload the ZIP file using the following command: `Publish-AzWebapp -ResourceGroupName <resourcegroupname> -Name <functionappname> -ArchivePath <path to zip file> -Force`. If you want to make changes to the ZIP-file, simply send the contents of the `AzureFunction`-folder (minus any `.venv`-folder you might have created) to a ZIP-file and upload that.
    - If using AZ CLI, you can upload the ZIP file using the following command: `az functionapp deployment source config-zip --resource-group <resourcegroupname> --name <functionappname> --src <path to zip file>`.
 
-9. Add a "New application setting" (env variable) to your Azure Function named `tenant`. Create a reference to the key vault previously created (`@Microsoft.KeyVault(SecretUri=https://<keyvaultname>.vault.azure.net/secrets/tenant/)`).
-10. Do the same for the `datalake` secret (`@Microsoft.KeyVault(SecretUri=https://<keyvaultname>.vault.azure.net/secrets/datalake/)`)
-11. Do the same for the `certificate` secret if needed (`@Microsoft.KeyVault(SecretUri=https://<keyvaultname>.vault.azure.net/certificates/cert/)`)
-12. Add a "New application setting" (env variable) `timerTriggerSchedule` and set it to run. The `timerTriggerSchedule` takes a cron expression. For more information, see [Timer trigger for Azure Functions](https://learn.microsoft.com/en-us/azure/azure-functions/functions-bindings-timer?tabs=python-v2%2Cin-process&pivots=programming-language-python).
-13. Do the same for `log_file` and set it to `/tmp/datalake2sentinel.log`.
-14. In some case you need to change the value of env variable `FUNCTIONS_EXTENSION_VERSION` from `~4` to `~3`.
+8. Add the Azure credential application settings `CLIENT_ID`, `TENANT_ID`, `CLIENT_CREDENTIAL`, and `WORKSPACE_ID` in your Azure Function, each as a Key Vault reference (for example: `@Microsoft.KeyVault(SecretUri=https://<keyvaultname>.vault.azure.net/secrets/CLIENT-ID/)`).
+9. Do the same for the Datalake settings `DATALAKE_TOKEN` and `DATALAKE_ENV` (for example: `@Microsoft.KeyVault(SecretUri=https://<keyvaultname>.vault.azure.net/secrets/DATALAKE-TOKEN/)`).
+10. Do the same for the `CLIENT_CERTIFICATE` secret if needed (`@Microsoft.KeyVault(SecretUri=https://<keyvaultname>.vault.azure.net/certificates/cert/)`)
+11. Add a "New application setting" (env variable) `TIMER_TRIGGER_SCHEDULE` and set it to run. The `TIMER_TRIGGER_SCHEDULE` takes a cron expression. For more information, see [Timer trigger for Azure Functions](https://learn.microsoft.com/en-us/azure/azure-functions/functions-bindings-timer?tabs=python-v2%2Cin-process&pivots=programming-language-python).
+12. Any variable from the [`.env.sample`] file can be added as an application setting in your Azure Function to override its default value (e.g. `LOG_FILE` set to `/tmp/datalake2sentinel.log`).
+13. In some case you need to change the value of env variable `FUNCTIONS_EXTENSION_VERSION` from `~4` to `~3`.

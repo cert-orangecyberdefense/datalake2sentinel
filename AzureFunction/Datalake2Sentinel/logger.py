@@ -1,38 +1,30 @@
 import logging
 from logging.handlers import RotatingFileHandler
-import os
 import sys
+from .constants import LOG_LEVEL, LOG_FILE
 
 
 class Logger:
     @staticmethod
-    def _create_logger(config):
+    def _create_logger():
         """This logger both saves its logs at /tmp/datalake2sentinel.log and prints them to the terminal"""
         logger = logging.getLogger("datalake2sentinel")
-        logger.setLevel(logging.INFO)
-        if getattr(config, "verbose_log", False):
-            logger.setLevel(logging.DEBUG)
-
+        logger.setLevel(LOG_LEVEL)
 
         stream_handler = logging.StreamHandler(sys.stderr)
-        stream_handler.setLevel(logging.INFO)
-        if getattr(config, "verbose_log", False):
-            stream_handler.setLevel(logging.DEBUG)
+        stream_handler.setLevel(LOG_LEVEL)
 
         formatter = logging.Formatter(
             "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
         )
         stream_handler.setFormatter(formatter)
 
-        log_file = os.getenv("log_file", None)
-
-        if log_file:
+        if LOG_FILE:
             file_handler = RotatingFileHandler(
-                log_file , mode="a", maxBytes=16000, backupCount=1
+                LOG_FILE, mode="a", maxBytes=16000, backupCount=1
             )
             file_handler.setLevel(logging.INFO)
-            if getattr(config, "verbose_log", False):
-                file_handler.setLevel(logging.DEBUG)
+            file_handler.setLevel(LOG_LEVEL)
 
             file_handler.setFormatter(formatter)
             logger.addHandler(file_handler)
