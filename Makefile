@@ -1,5 +1,7 @@
 init:
-	pip install -r requirements.txt
+	python3 -m venv .venv
+	. .venv/bin/activate
+	pip install -r AzureFunction/requirements.txt
 
 lint:
 	black .
@@ -10,20 +12,11 @@ clean:
 	rm -rf .venv
 
 run: init
-	python3 core.py
+	python3 AzureFunction/Datalake2Sentinel/run_local.py
 
 run_docker:
-	docker build . -t datalake2sentinel
+	docker build  -t datalake2sentinel .
 	docker run datalake2sentinel
 
-test_dev:
-	( \
-		python3 -m venv .venv; \
-		. .venv/bin/activate; \
-		pip install -r requirements.txt; \
-		pytest; \
-		deactivate \
-	)
-
-test: lint
+test: init lint
 	@pytest

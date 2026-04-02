@@ -13,3 +13,8 @@ python-dotenv
 # Azure specifics
 azure-keyvault-secrets
 azure-identity
+
+# Tests
+black
+pytest
+pytest-asyncio

@@ -1,5 +1,5 @@
 {
-    "scriptFile": "core.py",
+    "scriptFile": "run_azure.py",
     "bindings": [
       {
         "name": "mytimer",

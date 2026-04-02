@@ -1,34 +1,18 @@
 import asyncio
+import ipaddress
 import json
+import logging
 import time
 import uuid
-import ipaddress
-import requests
-import logging
-from ratelimit import limits, sleep_and_retry
-from .constants import (
-    DATALAKE_TOKEN,
-    DATALAKE_ENV,
-    CLIENT_ID,
-    TENANT_ID,
-    CLIENT_CREDENTIAL,
-    WORKSPACE_ID,
-    DATALAKE_QUERIES,
-    AZURE_SCOPE,
-    AZURE_AUTHORITY_URL,
-    BATCH_SIZE,
-    REQUESTS_PER_MINUTE,
-    SOURCE_SYSTEM_NAME,
-    ADD_SCORE_LABELS,
-    ADD_THREAT_ENTITIES_AS_LABELS,
-    ADD_THREAT_TAGS_AS_LABELS,
-    THREATS_DOWNLOAD_TIMEOUT_SEC
-)
-from msal import ConfidentialClientApplication
 from datetime import datetime, timedelta
-from stix2 import Indicator, exceptions
+
+import constants
+import exceptions as exc
+import requests
 from datalake import Datalake, Output
-from .exceptions import DatalakeError, DatalakeConnectionError, DatalakeAuthenticationError, DatalakePermissionError
+from msal import ConfidentialClientApplication
+from ratelimit import limits, sleep_and_retry
+from stix2 import Indicator, exceptions
 
 
 class Datalake2Sentinel:
@@ -39,37 +23,36 @@ class Datalake2Sentinel:
 
     def __init__(self, logger, certificate):
         self.logger = logger
-        self.dtlLongTermToken = DATALAKE_TOKEN
-        self.dtlEnvironment = DATALAKE_ENV
-        self.clientId = CLIENT_ID
-        self.tenantId = TENANT_ID
+        self.dtlLongTermToken = constants.DATALAKE_TOKEN
+        self.dtlEnvironment = constants.DATALAKE_ENV
+        self.clientId = constants.CLIENT_ID
+        self.tenantId = constants.TENANT_ID
         self.clientCredential = (
-            certificate if certificate else CLIENT_CREDENTIAL
+            certificate if certificate else constants.CLIENT_CREDENTIAL
         )
-        self.workspaceId = WORKSPACE_ID
-        self.dtlQueries = json.loads(DATALAKE_QUERIES)
-        self.dtlAddScoreLabels = ADD_SCORE_LABELS
-        self.dtlAddThreatEntitiesLabels = ADD_THREAT_ENTITIES_AS_LABELS
-        self.dtlAddThreatTagsLabels = ADD_THREAT_TAGS_AS_LABELS
-        self.dtlThreatDownloadTimeout = THREATS_DOWNLOAD_TIMEOUT_SEC
+        self.workspaceId = constants.WORKSPACE_ID
+        self.dtlQueries = json.loads(constants.DATALAKE_QUERIES)
+        self.dtlAddScoreLabels = constants.ADD_SCORE_LABELS
+        self.dtlAddThreatEntitiesLabels = constants.ADD_THREAT_ENTITIES_AS_LABELS
+        self.dtlAddThreatTagsLabels = constants.ADD_THREAT_TAGS_AS_LABELS
+        self.dtlThreatDownloadTimeout = constants.THREATS_DOWNLOAD_TIMEOUT_SEC
 
         self.dtl = Datalake(
             longterm_token=self.dtlLongTermToken,
             env=self.dtlEnvironment,
-            log_level=logging.ERROR
+            log_level=logging.ERROR,
         )
 
         try:
             self.currentUserInfo = self.dtl.MyAccount.me()
         except ConnectionError as e:
-            raise DatalakeConnectionError(f"Unable to connect to Datalake: {e}")
+            raise exc.DatalakeConnectionError(f"Unable to connect to Datalake: {e}")
         except ValueError as e:
-            raise DatalakeAuthenticationError(f"Authentication error: {e}")
+            raise exc.DatalakeAuthenticationError(f"Authentication error: {e}")
         except Exception as e:
-            raise DatalakeError(f"Unexpected error: {e}")
+            raise exc.DatalakeError(f"Unexpected error: {e}")
 
-        self.logger.debug(
-            f"""
+        self.logger.debug(f"""
                 Init of Datlake2Sentinel done
                 on tenant {self.tenantId} and workspace {self.workspaceId} for client {self.clientId}
                 with options for Datalake set as :
@@ -77,8 +60,7 @@ class Datalake2Sentinel:
                 - scores labels : {self.dtlAddScoreLabels}
                 - threat entities labels : {self.dtlAddThreatEntitiesLabels}
                 - threat tags labels: {self.dtlAddThreatTagsLabels}
-            """
-        )
+            """)
 
     def _checkpermission(self, name):
         permissions = self.currentUserInfo["role"]["administration_permissions"]
@@ -89,7 +71,10 @@ class Datalake2Sentinel:
 
     def _getDalakeThreats(self):
         if not self._checkpermission("bulk_search"):
-            raise DatalakePermissionError("User doesn't have bulk_search permission. Please check your datalake credentials and permissions")
+            raise exc.DatalakePermissionError(
+                "User doesn't have bulk_search permission. "
+                "Please check your datalake credentials and permissions"
+            )
 
         query_fields = [
             "atom_type",
@@ -138,11 +123,11 @@ class Datalake2Sentinel:
             finally:
                 loop.close()
         except TimeoutError:
-            raise DatalakeError(
+            raise exc.DatalakeError(
                 f"Download timeout exceeded {self.dtlThreatDownloadTimeout}s"
             )
         except Exception as e:
-            raise DatalakeError(f"Failed to retrieve threats: {e}")
+            raise exc.DatalakeError(f"Failed to retrieve threats: {e}")
 
         return results
 
@@ -295,7 +280,7 @@ class Datalake2Sentinel:
         return stix_labels
 
     def _getAzureAppToken(self):
-        self.logger.info(f"Generating new Azure token ...")
+        self.logger.info("Generating new Azure token ...")
 
         client_id = self.clientId
         tenant_id = self.tenantId
@@ -303,11 +288,13 @@ class Datalake2Sentinel:
 
         app = ConfidentialClientApplication(
             client_id=client_id,
-            authority=AZURE_AUTHORITY_URL + tenant_id,
+            authority=constants.AZURE_AUTHORITY_URL + tenant_id,
             client_credential=client_credential,
         )
 
-        acquire_tokens_result = app.acquire_token_for_client(scopes=[AZURE_SCOPE])
+        acquire_tokens_result = app.acquire_token_for_client(
+            scopes=[constants.AZURE_SCOPE]
+        )
 
         if "error" in acquire_tokens_result:
             self.logger.error(
@@ -315,12 +302,12 @@ class Datalake2Sentinel:
                 f"Description: {acquire_tokens_result['error_description']}"
             )
         else:
-            self.logger.info(f"New Azure token acquired")
+            self.logger.info("New Azure token acquired")
             return acquire_tokens_result["access_token"]
 
     def _batch_post_requests(self, indicators):
-        num_batches = len(indicators) // BATCH_SIZE + (
-            1 if len(indicators) % BATCH_SIZE else 0
+        num_batches = len(indicators) // constants.BATCH_SIZE + (
+            1 if len(indicators) % constants.BATCH_SIZE else 0
         )
         access_token = self._getAzureAppToken()
         self.logger.info("Uploading indicators to Azure Sentinel ...")
@@ -331,8 +318,8 @@ class Datalake2Sentinel:
 
         while batch_index < num_batches:
             # Extract the batch
-            start_index = batch_index * BATCH_SIZE
-            end_index = start_index + BATCH_SIZE
+            start_index = batch_index * constants.BATCH_SIZE
+            end_index = start_index + constants.BATCH_SIZE
             batch = indicators[start_index:end_index]
 
             # Send the request
@@ -340,12 +327,14 @@ class Datalake2Sentinel:
 
             if response.status_code == 429:
                 self.logger.debug(
-                    f"Error HTTP 429. Rate Limit reached. Waiting for {response.headers['Retry-After']} seconds before retrying batch"
+                    "Error HTTP 429. Rate Limit reached. "
+                    f"Waiting for {response.headers['Retry-After']} seconds before retrying batch"
                 )
                 time.sleep(int(response.headers["Retry-After"]))
             elif retry == 0 and response.status_code in (504, 503):
                 self.logger.warning(
-                    f"Error HTTP {response.status_code}. Possible temporary issue. Waiting for 1 minute before retrying once"
+                    f"Error HTTP {response.status_code}. Possible temporary issue. "
+                    "Waiting for 1 minute before retrying once"
                 )
                 time.sleep(60)
                 retry += 1
@@ -353,7 +342,8 @@ class Datalake2Sentinel:
                 if response.status_code != 200:
                     # We already retried once or error unhandled yet, we log and go to next batch
                     self.logger.error(
-                        f"Error HTTP {response.status_code} occured for current batch, text/reason : {response.text} and {response.reason}"
+                        "Error HTTP {response.status_code} occured for current batch, text/reason: "
+                        f"{response.text} and {response.reason}"
                     )
                 batch_index = batch_index + 1
                 retry = 0
@@ -362,9 +352,8 @@ class Datalake2Sentinel:
             f"Successful upload of {batch_index} batches to Azure Sentinel"
         )
 
-
     @sleep_and_retry
-    @limits(calls=REQUESTS_PER_MINUTE, period=60)
+    @limits(calls=constants.REQUESTS_PER_MINUTE, period=60)
     def _send_request(self, indicators, access_token):
         workspace_id = self.workspaceId
         upload_indicator_url = f"https://api.ti.sentinel.azure.com/workspaces/{workspace_id}/threat-intelligence-stix-objects:upload?api-version=2024-02-01-preview"
@@ -374,7 +363,7 @@ class Datalake2Sentinel:
         }
 
         data_to_upload = {
-            "sourcesystem": SOURCE_SYSTEM_NAME,
+            "sourcesystem": constants.SOURCE_SYSTEM_NAME,
             "stixobjects": [
                 json.loads(indicator.serialize()) for indicator in indicators
             ],
@@ -386,19 +375,12 @@ class Datalake2Sentinel:
             upload_indicator_url, headers=headers, data=data_to_upload
         )
 
-        if response.status_code == 200:
-            self.logger.debug("Successful upload of Indicators to Azure Sentinel")
-        else:
-            self.logger.error(
-                f"An error occured when uploading Indicators to Azure Sentinel : {response.status_code}"
-            )
-
         return response
 
     def uploadIndicatorsToSentinel(self):
         try:
             bulk_searches_results = self._getDalakeThreats()
-        except DatalakeError as e:
+        except exc.DatalakeError as e:
             self.logger.error(e)
             return
 
