@@ -1,5 +1,15 @@
+# Secrets & local config
 *.env
+local.settings.json
+# Deprecated local config file (kept to prevent accidental git push)
 config.py
-*.pytest_cache
-__pycache__
-*.venv
+
+# IDE
+.vscode/
+.idea/
+
+# Python cache
+__pycache__/
+.pytest_cache/
+.venv/
+.python_packages/
