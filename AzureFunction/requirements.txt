@@ -1,11 +1,11 @@
 # Core
-datalake-scripts==3.0.0rc7
+datalake-scripts==3.0.0
 datetime
 ipaddress
 msal
 ratelimit
 requests
-schedule
+apscheduler
 stix2
 wheel
 python-dotenv

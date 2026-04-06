@@ -36,9 +36,7 @@ WORKSPACE_ID = os.getenv("WORKSPACE_ID")
 CLIENT_CERTIFICATE = os.getenv("CLIENT_CERTIFICATE")
 
 AZURE_SCOPE = os.getenv("AZURE_SCOPE", "https://management.azure.com/.default")
-AZURE_AUTHORITY_URL = os.getenv(
-    "AZURE_AUTHORITY_URL", "https://login.microsoftonline.com/"
-)
+AZURE_AUTHORITY_URL = os.getenv("AZURE_AUTHORITY_URL", "https://login.microsoftonline.com/")
 BATCH_SIZE = int(os.getenv("BATCH_SIZE", 100))
 REQUESTS_PER_MINUTE = int(os.getenv("REQUESTS_PER_MINUTE", 100))
 SOURCE_SYSTEM_NAME = os.getenv("SOURCE_SYSTEM_NAME", "Datalake - OrangeCyberdefense")
@@ -47,6 +45,6 @@ ADD_THREAT_ENTITIES_AS_LABELS = get_bool_env("ADD_THREAT_ENTITIES_AS_LABELS", Tr
 ADD_THREAT_TAGS_AS_LABELS = get_bool_env("ADD_THREAT_TAGS_AS_LABELS", True)
 
 THREATS_DOWNLOAD_TIMEOUT_SEC = int(os.getenv("THREATS_DOWNLOAD_TIMEOUT_SEC", 1800))
-UPLOAD_FREQUENCY = int(os.getenv("UPLOAD_FREQUENCY", 1))
+TRIGGER_SCHEDULE = os.getenv("TRIGGER_SCHEDULE", "0 0 * * *")
 
 RUN_AS_CRON = get_bool_env("RUN_AS_CRON", False)
