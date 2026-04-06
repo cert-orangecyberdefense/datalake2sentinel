@@ -1,19 +1,20 @@
-import schedule
 import time
-from .Datalake2Sentinel import Datalake2Sentinel
-from .constants import UPLOAD_FREQUENCY
-from .exceptions import DatalakeError
+
+import constants
+import exceptions as exc
+import schedule
+from Datalake2Sentinel import Datalake2Sentinel
 
 
-def main(logger, certificate, run_as_cron: bool = False):
+def start(logger, certificate=None, run_as_cron: bool = False):
     try:
         datalake2Sentinel = Datalake2Sentinel(logger, certificate)
-    except DatalakeError as e:
-        logger.error(e)
-        return
+    except exc.DatalakeError as e:
+        logger.error(str(e))
+        raise SystemExit(1)
 
     if run_as_cron:
-        schedule.every(UPLOAD_FREQUENCY).hours.do(
+        schedule.every(constants.UPLOAD_FREQUENCY).hours.do(
             datalake2Sentinel.uploadIndicatorsToSentinel
         )
         while True:

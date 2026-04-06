@@ -1,7 +1,6 @@
 import pytest
-import json
-from AzureFunction.Datalake2Sentinel.logger import Logger
-from AzureFunction.Datalake2Sentinel.Datalake2Sentinel import Datalake2Sentinel
+from logger import Logger
+from Datalake2Sentinel import Datalake2Sentinel
 from unittest import mock
 
 logger = Logger._create_logger()
@@ -96,7 +95,9 @@ tenant = {
     "workspaceId": "workspace-id",
 }
 
-with mock.patch("AzureFunction.Datalake2Sentinel.Datalake2Sentinel.Datalake") as MockDatalake:
+with mock.patch(
+    "AzureFunction.Datalake2Sentinel.Datalake2Sentinel.Datalake"
+) as MockDatalake:
     MockDatalake.return_value.MyAccount.me.return_value = {
         "role": {"administration_permissions": [{"name": "bulk_search"}]}
     }

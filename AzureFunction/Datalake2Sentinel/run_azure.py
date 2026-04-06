@@ -1,14 +1,19 @@
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(__file__))
 from datetime import datetime, timezone
+
 import azure.functions as func
+import constants
 from azure.identity._credentials.certificate import load_pem_certificate
-from .logger import Logger
-from .launch import main as pmain
-from .constants import CLIENT_CERTIFICATE
+from launch import start
+from logger import Logger
 
 
 def _get_certificate():
-    if CLIENT_CERTIFICATE:
-        certificate = load_pem_certificate(CLIENT_CERTIFICATE.encode())
+    if constants.CLIENT_CERTIFICATE:
+        certificate = load_pem_certificate(constants.CLIENT_CERTIFICATE.encode())
         return {
             "thumbprint": certificate.fingerprint.hex(),
             "private_key": certificate.private_key,
@@ -27,6 +32,9 @@ def main(mytimer: func.TimerRequest):
     certificate = _get_certificate()
 
     logger.info("Start Datalake2Sentinel")
-    pmain(logger, certificate)  # never run_as_cron for Azure Function
-    logger.info("End Datalake2Sentinel")
-    logger.info("Python timer trigger function ran at %s", utc_timestamp)
+    try:
+        # never run_as_cron for Azure Function
+        start(logger, certificate=certificate, run_as_cron=False)
+    finally:
+        logger.info("End Datalake2Sentinel")
+        logger.info("Python timer trigger function ran at %s", utc_timestamp)
