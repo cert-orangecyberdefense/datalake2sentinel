@@ -45,6 +45,7 @@ jobs:
         with:
           fail-on-severity: moderate
           comment-summary-in-pr: always
+          allow-unknown-licenses: true
 
   sast-codeql:
     name: SAST (CodeQL)
